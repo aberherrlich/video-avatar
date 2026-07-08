@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:karriere.hypoport.de)",
+      "Bash(awk '{print $9, \"\\(\" $5 \"\\)\"}')",
+      "Bash(awk 'NR>=75 && NR<=85 {print NR\": \"$0}; NR>=174 && NR<=184 {print NR\": \"$0}; NR>=229 && NR<=239 {print NR\": \"$0}; NR>=277 && NR<=287 {print NR\": \"$0}; NR>=325 && NR<=335 {print NR\": \"$0}; NR>=456 && NR<=466 {print NR\": \"$0}; NR>=516 && NR<=526 {print NR\": \"$0}; NR>=568 && NR<=578 {print NR\": \"$0}; NR>=582 && NR<=592 {print NR\": \"$0}; NR>=594 && NR<=604 {print NR\": \"$0}; NR>=608 && NR<=618 {print NR\": \"$0}; NR>=631 && NR<=641 {print NR\": \"$0}; NR>=668 && NR<=678 {print NR\": \"$0}; NR>=688 && NR<=698 {print NR\": \"$0}' /var/www/vhosts/marketing.hypoport.de/httpdocs/marketing.hypoport.de/html/test-avatar-v1.7/scss/base.scss)",
+      "Bash(awk 'NR>=68 && NR<=81 {print NR\": \"$0}; NR>=165 && NR<=180 {print NR\": \"$0}; NR>=215 && NR<=235 {print NR\": \"$0}; NR>=268 && NR<=283 {print NR\": \"$0}; NR>=317 && NR<=331 {print NR\": \"$0}; NR>=448 && NR<=462 {print NR\": \"$0}; NR>=510 && NR<=522 {print NR\": \"$0}; NR>=558 && NR<=574 {print NR\": \"$0}; NR>=576 && NR<=588 {print NR\": \"$0}; NR>=659 && NR<=674 {print NR\": \"$0}; NR>=679 && NR<=694 {print NR\": \"$0}' /var/www/vhosts/marketing.hypoport.de/httpdocs/marketing.hypoport.de/html/test-avatar-v1.7/scss/base.scss)",
+      "Bash(grep -r \"jobUrls\\\\|karriere.hypoport\" /var/www/vhosts/marketing.hypoport.de/httpdocs/marketing.hypoport.de/html --include=\"*.js\" --include=\"*.php\" 2>/dev/null)",
+      "Read(//var/www/vhosts/marketing.hypoport.de/httpdocs/marketing.hypoport.de/html/**)",
+      "Bash(find /var/www/vhosts/marketing.hypoport.de/httpdocs/marketing.hypoport.de/html -maxdepth 2 -type f \\\\\\( -name \"*.js\" -o -name \"*.py\" -o -name \"*.php\" \\\\\\) 2>/dev/null | head -30)",
+      "Bash(git init *)",
+      "Bash(git config *)",
+      "Bash(git add *)"
+    ]
+  }
+}

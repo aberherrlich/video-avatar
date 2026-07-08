@@ -1,0 +1,784 @@
+/**
+ * base.scss
+ *
+ * purpose: complete widget styling with BEM methodology
+ * components: container (.video-guide), progress ring, viewport, video, controls, buttons, splash, toggle
+ * key patterns:
+ *   - all four direct children of .video-guide are position: fixed, stacked at the same anchor
+ *   - __content and __splash share 256×256px; __load-indicator and __toggle are 128×128px
+ *   - pointer-events layering (controls: none, buttons: auto)
+ *   - z-index stacking (1: progress ring, 2: viewport/video, 3: controls) — within __content
+ *   - state classes (.js-* prefix — toggled by JS, no styles of their own)
+ *   - BEM naming (.block__element--modifier)
+ * dependencies: none (self-contained)
+ * color scheme: Deep Blue default, Signal Green progress ring, CTA Red for interaction states
+ */
+
+// -> CSS custom properties (theming)
+
+:root {
+  /* Hypoport brand palette (locked 2026-05-12) — 5-step system for versatility */
+
+  /* Deep Blue — Primary */
+  --vg-primary-50:  #f0f0f5;    /* very light (backgrounds only) */
+  --vg-primary-100: #d9d9e6;    /* light tint */
+  --vg-primary-400: #4a4a7a;    /* medium (hover alternatives) */
+  --vg-primary-600: #000033;    /* darker shade */
+  --vg-primary:     #00003c;    /* standard (base) */
+  --vg-primary-rgb: 0, 0, 60;   /* RGB form for rgba() overlays */
+
+  /* Signal Green — Accent */
+  --vg-accent-50:   #e8faf5;    /* very light (backgrounds) */
+  --vg-accent-100:  #b3f0de;    /* light tint */
+  --vg-accent-400:  #0fb899;    /* medium/darker for scrub ring */
+  --vg-accent-600:  #0a7d6a;    /* darker shade */
+  --vg-accent:      #1ef0aa;    /* standard (base) */
+  --vg-accent-rgb:  30, 240, 170; /* RGB form for rgba() overlays */
+
+  /* CTA Red — Interaction */
+  --vg-interaction-50:  #ffe8f0;  /* very light (backgrounds) */
+  --vg-interaction-100: #ff99bb;  /* light tint */
+  --vg-interaction-400: #e62851;  /* medium (alternative hover) */
+  --vg-interaction-600: #b31f3d;  /* darker shade */
+  --vg-interaction:     #ff286e;  /* standard (base) */
+  --vg-interaction-rgb: 255, 40, 110; /* RGB form for rgba() overlays */
+
+  /* Neutral */
+  --vg-white: #ffffff;           /* White — viewport background, icon backgrounds */
+  --vg-transparent: transparent; /* Transparent for border animations */
+}
+
+// -> global resets
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  width: 100%;
+}
+
+body {
+  min-height: 100vh;
+}
+
+p {
+  font-size: 24px;
+}
+
+// -> widget container
+
+.video-guide {
+  position: fixed;
+  width: 256px;
+  height: 256px;
+  right: 64px;
+  bottom: 64px;
+  z-index: 10;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background-color: lightcoral;
+
+  @media (max-width: 576px) {
+    display: none;
+  }
+
+  // -> content layer (video player)
+  &.js-widget-ready {
+    .video-guide__toggle {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .video-guide__content {
+      opacity: 1;
+    }
+  }
+
+  // -> button base reset
+  button {
+    box-sizing: border-box;
+    appearance: none;
+    -webkit-appearance: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  // -> progress grabber dot state
+  &.js-playing {
+    .video-guide__progress-grabber-dot {
+      background: var(--vg-interaction);
+    }
+
+    .video-guide__progress-ring {
+      &:hover ~ .video-guide__progress-grabber .video-guide__progress-grabber-dot,
+      &.js-dragging ~ .video-guide__progress-grabber .video-guide__progress-grabber-dot {
+        background: var(--vg-interaction);
+        box-shadow: 0 0 0 2px var(--vg-interaction-100);
+      }
+    }
+  }
+}
+
+// -> content element
+
+.video-guide__content {
+  position: absolute;
+  top: 72px;
+  right: 72px;
+  width: 112px;
+  height: 112px;
+
+  opacity: 0;
+
+  transition:
+    opacity .4s ease,
+    top .6s cubic-bezier(0.6, 0, 0.2, 1),
+    right .6s cubic-bezier(0.6, 0, 0.2, 1),
+    width .6s cubic-bezier(0.6, 0, 0.2, 1),
+    height .6s cubic-bezier(0.6, 0, 0.2, 1);
+
+  &.js-content-minimized {
+    pointer-events: none;
+  }
+
+  &.js-content-expanded {
+    top: 32px;
+    right: 32px;
+    width: 224px;
+    height: 224px;
+
+    .video-guide__controls-btn--volume {
+      transform: translateX(-50%) translateX(-26px) scale(1);
+    }
+
+    .video-guide__controls-btn--play {
+      transform: translateX(-50%) translateX(26px) scale(1);
+    }
+  }
+}
+
+// -> toggle reveal trigger zone (top-right quarter of content)
+// geometry marker only — pointer-events stays none permanently so it never
+// intercepts clicks/hover meant for the progress ring or video beneath it.
+// detection happens via mousemove + getBoundingClientRect() in JS.
+
+.video-guide__content-hotspot {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 50%;
+  height: 50%;
+  pointer-events: none;
+
+  background: limegreen; // testing only — remove in production
+}
+
+// -> loader
+
+.video-guide__loader {
+  position: absolute;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg,
+    var(--vg-accent),
+    #8ffce0,
+    var(--vg-interaction-100),
+    var(--vg-interaction),
+    var(--vg-interaction-100),
+    #8ffce0,
+    var(--vg-accent)
+  );
+  background-size: 400% 400%;
+  pointer-events: none;
+  z-index: 12;
+  animation:
+    vg-float    5s ease-in-out infinite,
+    vg-gradient 10s ease-in-out infinite;
+
+  svg {
+    pointer-events: none;
+    /* attract: instant (driven by mousemove); snap-back: spring overshoot then settle */
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    &.js-attracting {
+      transition: none;
+    }
+  }
+
+  &.js-hidden {
+    display: none;
+  }
+}
+
+@keyframes vg-float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
+}
+
+@keyframes vg-gradient {
+  0%   { background-position: 0%   85%; }
+  15%  { background-position: 100% 10%; }
+  30%  { background-position: 30%  100%; }
+  47%  { background-position: 90%  60%; }
+  63%  { background-position: 10%  0%; }
+  78%  { background-position: 75%  90%; }
+  100% { background-position: 0%   85%; }
+}
+
+// -> splash layer (avatar + chat bubble — 256×256)
+
+.video-guide__splash {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+
+  img {
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    border-radius: 100%;
+    object-fit: cover;
+    object-position: center;
+    border: 4px solid var(--vg-primary);
+
+    transition: border-width 0.2s cubic-bezier(0.6, 0, 0.2, 1),
+                border-color 0.2s cubic-bezier(0.6, 0, 0.2, 1);
+  }
+
+  &.js-splash-expanded {
+    width: 128px;
+    height: 128px;
+  }
+
+  &.js-splash-minimized {
+    width: 0;
+    height: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+.video-guide__toggle:not(.js-toggle-revealed) .video-guide__splash img:hover {
+  border-width: 8px;
+  border-color: var(--vg-interaction);
+}
+
+.video-guide__toggle.js-toggle-toggling .video-guide__splash img {
+  border-width: 8px;
+  border-color: var(--vg-interaction);
+  transition: border-width 0.2s cubic-bezier(0.6, 0, 0.2, 1),
+              border-color 0.2s cubic-bezier(0.6, 0, 0.2, 1);
+}
+
+// -> toggle layer (minimize/maximize)
+
+.video-guide__toggle {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  top: 64px;
+  right: 64px;
+  width: 128px;
+  height: 128px;
+
+  z-index: 10;
+
+  cursor: pointer;
+  pointer-events: none;
+
+  opacity: 0;
+
+  transition:
+    opacity .4s ease,
+    top .4s cubic-bezier(0.6, 0, 0.2, 1),
+    right .4s cubic-bezier(0.6, 0, 0.2, 1),
+    width .6s cubic-bezier(0.6, 0, 0.2, 1),
+    height .6s cubic-bezier(0.6, 0, 0.2, 1),
+    border-width .2s cubic-bezier(0.6, 0, 0.2, 1);
+
+  clip-path: circle(50%);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: var(--vg-primary);
+    border-radius: 50%;
+    opacity: 1;
+  }
+
+  .video-guide__splash {
+    transform: translate(0, 0);
+    opacity: 1;
+
+    transition:
+      transform 0.5s cubic-bezier(0.6, 0, 0.2, 1),
+      opacity 0.5s cubic-bezier(0.6, 0, 0.2, 1);
+  }
+
+  .video-guide__toggle-btn--minimize {
+    transform: translate(-80px, 80px);
+    opacity: 0;
+    transition: transform 0.5s cubic-bezier(0.6, 0, 0.2, 1),
+                opacity 0.5s cubic-bezier(0.6, 0, 0.2, 1);
+
+    // opacity: 1;
+  }
+
+  &.js-toggle-revealed {
+    top: 0;
+    right: 0;
+    width: 56px;
+    height: 56px;
+
+    .video-guide__splash {
+      transform: translate(64px, -64px);
+      opacity: 0;
+      transition:
+        transform 0.5s cubic-bezier(0.6, 0, 0.2, 1),
+        opacity 0.5s cubic-bezier(0.6, 0, 0.2, 1);
+    }
+
+    .video-guide__splash img {
+      border-width: 8px;
+      border-color: var(--vg-interaction);
+    }
+
+    .video-guide__toggle-btn--minimize {
+      transform: translate(0, 0);
+      opacity: 1;
+    }
+
+    /* auto-hide after 5s idle in expanded mode — fades out and slides back to center */
+    &.js-toggle-idle {
+      opacity: 0;
+      pointer-events: none;
+      top: 64px;
+      right: 64px;
+    }
+  }
+}
+
+// -> chat bubble
+
+.video-guide__chat-bubble {
+  position: absolute;
+  bottom: 70%;
+  right: 70%;
+  width: 200px;
+  background: var(--vg-white);
+  border-radius: 16px 16px 4px 16px;
+  padding: 12px 16px;
+  box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 16px;
+  pointer-events: none;
+
+  opacity: 0;
+  transform: scale(0.85) translate(10px, 10px);
+  transform-origin: bottom right;
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+
+  display: none;
+
+  &.js-bubble-visible {
+    opacity: 1;
+    transform: scale(1) translate(0, 0);
+  }
+}
+
+.video-guide__chat-bubble-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--vg-primary);
+  font-family: sans-serif;
+}
+
+// -> progress ring
+
+.video-guide__progress-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--vg-accent);
+  overflow: hidden;
+  box-shadow: rgba(0, 0, 0, 0.56) 0px 22px 70px 4px;
+  z-index: 1;
+  cursor: pointer;
+  touch-action: none; /* prevent scroll hijack during ring drag */
+
+  // &::before {
+  //   content: '';
+  //   position: absolute;
+  //   top: 0;
+  //   left: 0;
+  //   width: 100%;
+  //   height: 100%;
+  //   border-radius: 50%;
+  //   background: var(--vg-primary);
+  //   opacity: 0.5;
+  // }
+
+  &.js-dragging {
+    cursor: grabbing;
+  }
+
+  &:hover ~ .video-guide__progress-grabber .video-guide__progress-grabber-dot,
+  &.js-dragging ~ .video-guide__progress-grabber .video-guide__progress-grabber-dot {
+    transform: scale(2);
+    background: var(--vg-accent-400);
+    box-shadow: 0 0 0 2px var(--vg-accent);
+  }
+}
+
+.video-guide__progress-ring-left {
+  width: 50%;
+  height: 100%;
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  background: var(--vg-primary);
+  /* border-top-left-radius: 50%;
+  border-bottom-left-radius: 50%; */
+}
+
+.video-guide__progress-ring-right {
+  width: 50%;
+  height: 100%;
+  position: absolute;
+  top: 0px;
+  left: 50%;
+  background: var(--vg-primary);
+  /* border-top-right-radius: 50%;
+  border-bottom-right-radius: 50%; */
+  transform-origin: left center;
+}
+
+// -> progress grabber
+
+.video-guide__progress-grabber {
+  position: absolute;
+  top: 2%;
+  left: 2%;
+  width: 96%;
+  height: 96%;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.video-guide__progress-grabber-dot {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: var(--vg-accent-400);
+
+  transition:
+    transform 0.2s cubic-bezier(0.6, 0, 0.2, 1),
+    background 0.2s cubic-bezier(0.6, 0, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.6, 0, 0.2, 1);
+
+  pointer-events: none;
+}
+
+/* dot turns red while video is playing */
+.video-guide.js-playing .video-guide__progress-grabber-dot {
+  background: var(--vg-interaction);
+}
+
+/* ring is the real pointer-events target — trigger dot style via sibling combinator */
+.video-guide__progress-ring:hover ~ .video-guide__progress-grabber .video-guide__progress-grabber-dot,
+.video-guide__progress-ring.js-dragging ~ .video-guide__progress-grabber .video-guide__progress-grabber-dot {
+  transform: scale(2);
+  background: var(--vg-accent-400);
+  box-shadow: 0 0 0 2px var(--vg-accent);
+}
+
+.video-guide.js-playing .video-guide__progress-ring:hover ~ .video-guide__progress-grabber .video-guide__progress-grabber-dot,
+.video-guide.js-playing .video-guide__progress-ring.js-dragging ~ .video-guide__progress-grabber .video-guide__progress-grabber-dot {
+  background: var(--vg-interaction);
+  box-shadow: 0 0 0 2px var(--vg-interaction-100);
+}
+
+// -> viewport & video
+
+.video-guide__viewport {
+  position: absolute;
+  left: 4%;
+  top: 4%;
+  width: 92%;
+  height: 92%;
+  background: #fff;
+  border-radius: 50%;
+  text-align: center;
+  z-index: 2;
+}
+
+.video-guide__video-wrapper {
+  height: 100%;
+  width: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1;
+  cursor: pointer;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: url('../sample/sample_bg.png') center/cover no-repeat;
+    filter: blur(3px);
+    z-index: -1;
+  }
+
+  &:hover .video-guide__play-icon {
+    opacity: 1;
+  }
+
+  &.js-playing .video-guide__play-icon {
+    display: none;
+  }
+}
+
+.video-guide__video {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+// -> play icon
+
+.video-guide__play-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60px;
+  height: 60px;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+  pointer-events: none;
+  background: rgba(var(--vg-primary-rgb), 0.5);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+
+  svg {
+    width: 30px;
+    height: 30px;
+    fill: var(--vg-white);
+    stroke: var(--vg-white);
+  }
+
+  svg path,
+  svg g {
+    fill: var(--vg-white);
+    stroke: var(--vg-white);
+  }
+}
+
+.video-guide__video-wrapper:hover .video-guide__play-icon {
+  opacity: 1;
+}
+
+.video-guide__video-wrapper.js-playing .video-guide__play-icon {
+  display: none;
+}
+
+// -> controls overlay
+
+.video-guide__controls {
+  position: absolute;
+  top: 4%;
+  left: 4%;
+  width: 92%;
+  height: 92%;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  z-index: 3;
+  pointer-events: none;
+}
+
+// -> toggle button
+
+.video-guide__toggle-btn {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease-in-out;
+
+  width: 64px;
+  height: 64px;
+
+  border: 2px solid var(--vg-primary);
+  border-radius: 100%;
+
+  background: var(--vg-primary);
+  z-index: 10;
+
+  svg {
+    width: 32px;
+    height: 32px;
+    fill: var(--vg-white);
+    stroke: var(--vg-white);
+    transition: all 0.3s ease-in-out;
+  }
+
+  svg path,
+  svg g {
+    fill: var(--vg-white);
+    stroke: var(--vg-white);
+  }
+
+  &:hover {
+    background: var(--vg-interaction);
+    border-color: var(--vg-interaction);
+  }
+
+  &:active,
+  &:focus-visible {
+    background: var(--vg-interaction);
+    border-color: var(--vg-interaction);
+    outline: none;
+  }
+
+  &:focus {
+    background: var(--vg-primary);
+    border-color: var(--vg-primary);
+    outline: none;
+
+    &:hover {
+      background: var(--vg-interaction);
+      border-color: var(--vg-interaction);
+    }
+  }
+}
+
+// -> controls buttons
+
+.video-guide__controls-btn {
+  border-radius: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease-in-out;
+  pointer-events: auto;
+  width: 48px;
+  height: 48px;
+  background: var(--vg-primary);
+  border: 2px solid var(--vg-primary);
+
+  transform: scale(0);
+
+  svg {
+    width: 32px;
+    height: 32px;
+    fill: var(--vg-white);
+    stroke: var(--vg-white);
+    transition: all 0.3s ease-in-out;
+  }
+
+  svg path,
+  svg g {
+    fill: var(--vg-white);
+    stroke: var(--vg-white);
+  }
+
+  &:hover {
+    background: var(--vg-interaction);
+    border-color: var(--vg-interaction);
+  }
+
+  &:active,
+  &:focus-visible {
+    background: var(--vg-interaction);
+    border-color: var(--vg-interaction);
+    outline: none;
+  }
+
+  &:focus {
+    background: var(--vg-primary);
+    border-color: var(--vg-primary);
+    outline: none;
+
+    &:hover {
+      background: var(--vg-interaction);
+      border-color: var(--vg-interaction);
+    }
+  }
+
+  &--play,
+  &--volume {
+    position: absolute;
+    bottom: -24px;
+    left: 50%;
+  }
+
+  &--volume {
+    transform: translateX(-50%) translateX(-26px) scale(0);
+  }
+
+  &--play {
+    transform: translateX(-50%) translateX(26px) scale(0);
+  }
+}
+
+.video-guide__content.js-content-expanded .video-guide__controls-btn--volume {
+  transform: translateX(-50%) translateX(-26px) scale(1);
+}
+
+.video-guide__content.js-content-expanded .video-guide__controls-btn--play {
+  transform: translateX(-50%) translateX(26px) scale(1);
+}
+
+.video-guide__avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}

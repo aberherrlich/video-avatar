@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Guide Widget Demo - iframe Approach</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #page-iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+
+        /* Ensure widget appears on top of iframe */
+        .video-guide,
+        .video-guide__restore-btn {
+            position: fixed;
+            z-index: 999999;
+        }
+    </style>
+
+    <!-- Video Guide Widget Styles -->
+    <link rel="stylesheet" href="css/base.css">
+    <!-- Source map for debugging -->
+    <link rel="stylesheet" href="css/base.css.map">
+</head>
+
+<body>
+    <!-- Embedded live company page — src set by job-rotator.js below -->
+    <iframe id="page-iframe"
+        title="Hypoport Karriere - Stellenangebot"
+        sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-popups-to-escape-sandbox">
+    </iframe>
+
+    <!-- Video Guide Widget Scripts -->
+    <script src="js/widget-loader.js"></script>
+    <script src="js/video-guide.js"></script>
+
+    <!-- -> job rotator -->
+    <script>
+        /**
+         * job-rotator
+         *
+         * purpose: load a random karriere.hypoport.de job into the iframe on each page load.
+         * approach: curated static url array — no cors or server dependency.
+         *           urls validated against karriere.hypoport.de/jobs on 2026-05-12.
+         *           all urls are currently active job postings.
+         */
+
+        // -> job url pool (active postings only, validated 2026-07-07)
+        const jobUrls = [
+
+
+            'https://karriere.hypoport.de/jobs/account-manager-baufinanzierung-b2b-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/ai-engineer-remote-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/backend-entwickler-java-hybrid-berlin-w-m-d-1',
+
+            'https://karriere.hypoport.de/jobs/baufinanzierungsberaterin-w-m-d-digitale-beratung',
+
+            'https://karriere.hypoport.de/jobs/bewirb-dich-jetzt-initiativ-1',
+
+            'https://karriere.hypoport.de/jobs/c-backend-entwickler-net-hybrid-leipzig-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/customer-service-manager-baufinanzierung-w-m-d-5',
+
+            'https://karriere.hypoport.de/jobs/customer-success-manager-saas-wohnungswirtschaft-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/customer-support-finanzierungen-w-m-d-remote',
+
+            'https://karriere.hypoport.de/jobs/customer-support-specialist-w-m-d-b2b-saas-100-remote',
+
+            'https://karriere.hypoport.de/jobs/data-engineer-fintech-remote-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/deine-ideen-unsere-zukunft-bewirb-dich-initiativ-6',
+
+            'https://karriere.hypoport.de/jobs/frontend-entwickler-react-typescript-im-banking-umfeld-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/frontend-entwicklerm-react-typescript-berlin-hybrid-finmas',
+
+            'https://karriere.hypoport.de/jobs/fullstack-developer-ai-engineer-remote-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/immobilienbesichtigerin-w-m-d-im-aussendienst-region-hamburg',
+
+            'https://karriere.hypoport.de/jobs/immobilienbesichtigerin-w-m-d-im-aussendienst-region-meppen-lingen-vechta',
+
+            'https://karriere.hypoport.de/jobs/immobilienbewerterin-w-m-d-im-bereich-kleindarlehen-2',
+
+            'https://karriere.hypoport.de/jobs/it-projektmanager-immobilienportal-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/junior-customer-support-specialist-b2b-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/junior-firmenkundenmanager-unternehmensfinanzierungen-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/junior-immobiliengutachter-w-m-d-1',
+
+            'https://karriere.hypoport.de/jobs/key-account-manager-baufinanzierung-b2b-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/key-account-manager-fintech-banken-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/key-account-manager-versicherung-schadenmanagement-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/lead-entwickler-c-net-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/legal-counsel-it-recht-vertragsmanagement-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/product-manager-fintech-plattform-in-berlin-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/product-manager-platform-scaling-product-operations-m-w-d',
+
+            'https://karriere.hypoport.de/jobs/produktmanager-versicherung-sach-haftpflicht-und-unfallversicherung-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/produktmanager-versicherungsprodukte-shu-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/regionalleiter-versicherung-fuer-die-wohnungswirtschaft-region-sued-100-remote-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/sales-manager-m-w-d-versicherungen-insurtech',
+
+            'https://karriere.hypoport.de/jobs/senior-analytics-engineer-snowflake-power-bi-deutschlandweit-remote-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/senior-firmenkundenmanager-unternehmensfinanzierungen-w-m-d-1',
+
+            'https://karriere.hypoport.de/jobs/senior-frontend-entwickler-angular-typescript-w-m-d-remote-1',
+
+            'https://karriere.hypoport.de/jobs/senior-fullstack-developer-angular-java-w-m-d-100-remote-deutschlandweit-2',
+
+            'https://karriere.hypoport.de/jobs/senior-ki-generalist-llm-und-ml-fintech-w-m-d-1',
+
+            'https://karriere.hypoport.de/jobs/senior-product-designerin-remote-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/solution-engineer-w-m-d-lead-platform',
+
+            'https://karriere.hypoport.de/jobs/spezialist-baufinanzierung-vertriebsunterstuetzung-b2b-sparkasse-lbs-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/spezialist-baufinanzierung-vertriebsunterstuetzung-b2b-sparkasse-w-m-d-3',
+
+            'https://karriere.hypoport.de/jobs/tech-lead-java-springboot-fintech-w-m-d-remote',
+
+            'https://karriere.hypoport.de/jobs/technischer-berater-w-m-d-lead-platform',
+
+            'https://karriere.hypoport.de/jobs/technischer-produktmanager-deutschlandweit-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/werkstudent-c-backend-entwickler-net-leipzig-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/werkstudent-data-reporting-analyst-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/werkstudent-ux-ui-design-fuer-webbasierte-softwareloesungen-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/werkstudentin-im-prozessmanagement-in-der-immobilienbewertung-w-m-d',
+
+            'https://karriere.hypoport.de/jobs/wirtschaftsjuristin-it-recht-vertragsmanagement-hybrid-in-leipzig-w-m-d',
+
+        ];
+
+        const iframe = document.getElementById('page-iframe');
+
+        /**
+         * setJob()
+         * purpose: point the iframe at a given url.
+         * input: url (string) — a karriere.hypoport.de job url
+         * output: sets iframe.src and iframe.title
+         */
+        function setJob(url) {
+            iframe.src = url;
+
+            // derive a readable title from the url slug for accessibility
+            const slug = url.replace('https://karriere.hypoport.de/jobs/', '').replace(/\/$/,'');
+            iframe.title = 'Hypoport Karriere - ' + slug.replace(/-/g, ' ');
+        }
+
+        /**
+         * pickRandomJob()
+         * purpose: select a random url from jobUrls.
+         * output: calls setJob() with the chosen url
+         */
+        function pickRandomJob() {
+            setJob(jobUrls[Math.floor(Math.random() * jobUrls.length)]);
+        }
+
+        // -> initial load: pick a random job on every page reload
+        document.addEventListener('DOMContentLoaded', function () {
+            pickRandomJob();
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,101 @@
+<!-- video guide widget -->
+<div class="video-guide js-minimized" role="region" aria-label="Video Guide">
+    <div class="video-guide__content js-content-minimized">
+
+        <div class="video-guide__progress-ring">
+            <div class="video-guide__progress-ring-left" aria-hidden="true"></div>
+            <div class="video-guide__progress-ring-right" aria-hidden="true"></div>
+        </div>
+
+        <div class="video-guide__progress-grabber" aria-hidden="true">
+            <div class="video-guide__progress-grabber-dot"></div>
+        </div>
+
+        <div class="video-guide__viewport">
+            <div class="video-guide__video-wrapper">
+                <video class="video-guide__video" id="vg-video" playsinline disablepictureinpicture>
+                    <source src="sample/sample-video_avatar-aline.webm" type="video/webm">
+                    <source src="sample/sample-video_avatar-aline.mp4" type="video/mp4">
+                </video>
+                <div class="video-guide__play-icon" aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" height="60" width="60"
+                        aria-hidden="true">
+                        <g id="play-arrow">
+                            <path id="Union" fill="#000000"
+                                d="M7 6.82098c0.00052 -1.5777 1.74299 -2.53351 3.0742 -1.68652l8.1367 5.17774c1.235 0.7859 1.2349 2.589 0 3.375l-8.1367 5.1777c-1.33132 0.8472 -3.07392 -0.1085 -3.0742 -1.6865zM9 17.1784l8.1377 -5.1787L9 6.82098z"
+                                stroke-width=".5"></path>
+                        </g>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="video-guide__controls">
+            <button class="video-guide__controls-btn video-guide__controls-btn--volume"
+                id="vg-btn-volume"
+                aria-label="Stummschalten"
+                title="Stummschalten"
+                aria-pressed="false">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" height="24" width="24"
+                    aria-hidden="true">
+                    <g id="volume-up">
+                        <path id="Union" fill="#000000"
+                            d="M14.0732 4.20703c0.2073 -0.51189 0.7899 -0.75889 1.3018 -0.55176C18.6714 4.98968 21 8.2224 21 12.001c-0.0003 3.7783 -2.3288 7.0104 -5.625 8.3447 -0.5118 0.207 -1.0945 -0.0401 -1.3018 -0.5518 -0.207 -0.5118 0.04 -1.0945 0.5518 -1.3017 2.5669 -1.0391 4.3747 -3.5555 4.375 -6.4912 0 -2.93606 -1.8079 -5.45298 -4.375 -6.49221 -0.5118 -0.20717 -0.7587 -0.78993 -0.5518 -1.30176m-3.7539 1.31055c0.2914 -0.27053 0.7156 -0.34332 1.0801 -0.18457 0.3646 0.15897 0.6006 0.51927 0.6006 0.91699v11.5c0 0.3977 -0.236 0.758 -0.6006 0.917 -0.3645 0.1588 -0.7887 0.086 -1.0801 -0.1846L7.10742 15.5H5c-1.10457 0 -2 -0.8954 -2 -2v-3c0.00002 -1.10455 0.89544 -2 2 -2h2.10742zM14 7.96777C15.4817 8.7041 16.4999 10.2332 16.5 12c0 1.7668 -1.0183 3.2959 -2.5 4.0322zM8.18066 10.2324c-0.18496 0.1718 -0.42825 0.2676 -0.68066 0.2676H5v3h2.5c0.2524 0 0.4957 0.0958 0.68066 0.2676L10 15.4561V8.54297z"
+                            stroke-width=".5"></path>
+                    </g>
+                </svg>
+            </button>
+
+            <button class="video-guide__controls-btn video-guide__controls-btn--play"
+                id="vg-btn-play"
+                aria-label="Play / Pause"
+                title="Play / Pause"
+                aria-pressed="false">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" height="24" width="24"
+                    aria-hidden="true">
+                    <g id="play-arrow">
+                        <path id="Union" fill="#000000"
+                            d="M7 6.82098c0.00052 -1.5777 1.74299 -2.53351 3.0742 -1.68652l8.1367 5.17774c1.235 0.7859 1.2349 2.589 0 3.375l-8.1367 5.1777c-1.33132 0.8472 -3.07392 -0.1085 -3.0742 -1.6865zM9 17.1784l8.1377 -5.1787L9 6.82098z"
+                            stroke-width=".5"></path>
+                    </g>
+                </svg>
+            </button>
+        </div>
+
+        <div class="video-guide__content-hotspot" aria-hidden="true"></div>
+    </div>
+
+    <div class="video-guide__loader" aria-hidden="true">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 48 48" width="28" height="28" aria-hidden="true">
+            <path fill="#ffffff" d="M27.855 3.998c-1.7489 -2.90619 -5.9623 -2.90619 -7.7112 0l-5.1678 8.5871c-0.2095 0.348 -0.5511 0.5962 -0.9468 0.6879l-9.76376 2.2613c-3.304406 0.7653 -4.606401 4.7724 -2.38291 7.3338l6.56989 7.5685c0.26626 0.3067 0.39675 0.7083 0.36163 1.113l-0.86654 9.9846c-0.29327 3.3792 3.11539 5.8557 6.23859 4.5326l9.2282 -3.9096c0.374 -0.1584 0.7962 -0.1584 1.1702 0l9.2283 3.9096c3.1231 1.3231 6.5318 -1.1534 6.2385 -4.5326l-0.8665 -9.9846c-0.0352 -0.4047 0.0953 -0.8063 0.3616 -1.113l6.5699 -7.5685c2.2235 -2.5614 0.9215 -6.5685 -2.3829 -7.3338l-9.7638 -2.2613c-0.3957 -0.0917 -0.7373 -0.3399 -0.9468 -0.6879L27.855 3.998Z" stroke-width="1"></path>
+        </svg>
+    </div>
+
+
+    <div class="video-guide__toggle" id="vg-toggle">
+                <div class="video-guide__splash" id="vg-splash">
+            <img class="video-guide__splash-avatar" src="sample/sample-splash_image-aline-shrink.jpg" alt="Video Guide Präsentatorin Aline">
+            <div class="video-guide__chat-bubble"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+                aria-hidden="true">
+                <p class="video-guide__chat-bubble-text">Hallo, ich bin Aline und helfe dir gern weiter wenn du Fragen hast.</p>
+            </div>
+        </div>
+        <button class="video-guide__toggle-btn video-guide__toggle-btn--minimize"
+            id="vg-btn-minimize"
+            aria-label="Minimieren"
+            title="Minimieren">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" height="24" width="24"
+                aria-hidden="true">
+                <g id="hide">
+                    <path id="Union" fill="#000000"
+                        d="M10 13.0001c0.0587 0 0.116 0.0059 0.1719 0.0156 0.0071 0.0012 0.0144 0.0015 0.0215 0.0029 0.0158 0.0031 0.0312 0.0079 0.0468 0.0117 0.017 0.0042 0.0341 0.0077 0.0508 0.0127 0.0491 0.0149 0.096 0.0347 0.1416 0.0567 0.0415 0.0199 0.0821 0.0423 0.1211 0.0683 0.1116 0.0744 0.2074 0.1703 0.2813 0.2823 0.0451 0.0684 0.0798 0.1415 0.1064 0.2168 0.0047 0.0133 0.0105 0.0264 0.0147 0.04 0.0062 0.0203 0.0107 0.0409 0.0156 0.0615 0.0176 0.0744 0.0283 0.1517 0.0283 0.2315v4c0 0.5522 -0.4478 0.9999 -1 1 -0.55226 0 -0.99996 -0.4478 -1 -1v-1.586l-3.54297 3.543c-0.3905 0.3905 -1.02353 0.3904 -1.41406 0 -0.39053 -0.3905 -0.39053 -1.0235 0 -1.4141l3.54297 -3.5429H6c-0.55226 0 -0.99996 -0.4478 -1 -1 0 -0.5523 0.44772 -1 1 -1zm8.543 -8.95707c0.3905 -0.39052 1.0235 -0.39052 1.414 0 0.3905 0.39053 0.3905 1.02356 0 1.41406l-3.5429 3.54297H18c0.5522 0.00004 1 0.44774 1 1.00004 0 0.5522 -0.4478 0.9999 -1 1h-4c-0.0566 0 -0.1119 -0.0066 -0.166 -0.0157 -0.0104 -0.0017 -0.0209 -0.0028 -0.0313 -0.0048 -0.0115 -0.0023 -0.0228 -0.0052 -0.0341 -0.0079 -0.0206 -0.0048 -0.0413 -0.0094 -0.0616 -0.0156 -0.0136 -0.0042 -0.0266 -0.0099 -0.04 -0.0146 -0.0174 -0.0062 -0.0347 -0.0124 -0.0518 -0.0196 -0.0089 -0.0037 -0.0176 -0.0077 -0.0263 -0.0117 -0.0476 -0.0215 -0.0943 -0.0459 -0.1387 -0.0752 -0.112 -0.0738 -0.2078 -0.1697 -0.2822 -0.2812 -0.026 -0.039 -0.0484 -0.0796 -0.0684 -0.1211 -0.0219 -0.0456 -0.0417 -0.0925 -0.0566 -0.1416 -0.0051 -0.0168 -0.0085 -0.0339 -0.0127 -0.0508 -0.0191 -0.0771 -0.0303 -0.1573 -0.0303 -0.2402V6.00006c0 -0.55228 0.4477 -1 1 -1 0.5522 0.00004 1 0.44774 1 1V7.586z"
+                        stroke-width=".5"></path>
+                </g>
+            </svg>
+        </button>
+
+    </div>
+</div>

@@ -1,0 +1,36 @@
+{
+  "recommendations": [
+    // HTML/CSS/JS support
+    "dbaeumer.vscode-eslint",
+    "stylelint.vscode-stylelint",
+    "formulahendry.auto-rename-tag",
+    "bradlc.vscode-tailwindcss",
+
+    // Code formatting and quality
+    "esbenp.prettier-vscode",
+    "editorconfig.editorconfig",
+
+    // Productivity
+    "christian-kohler.path-intellisense",
+    "zignd.html-css-class-completion",
+    "vincaslt.highlight-matching-tag",
+
+    // Accessibility testing
+    "deque-systems.vscode-axe-linter",
+
+    // BEM support
+    "bem.bem-tools",
+
+    // Color picker
+    "anseki.vscode-color",
+
+    // SVG preview
+    "jock.svg",
+
+    // SCSS/CSS compilation
+    "glenn2223.live-sass",
+
+    // AI
+    "anthropic.claude-code"
+  ]
+}
