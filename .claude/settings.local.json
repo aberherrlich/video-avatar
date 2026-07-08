@@ -10,7 +10,14 @@
       "Bash(find /var/www/vhosts/marketing.hypoport.de/httpdocs/marketing.hypoport.de/html -maxdepth 2 -type f \\\\\\( -name \"*.js\" -o -name \"*.py\" -o -name \"*.php\" \\\\\\) 2>/dev/null | head -30)",
       "Bash(git init *)",
       "Bash(git config *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git remote *)",
+      "Bash(git push *)",
+      "Bash(git fetch *)",
+      "Bash(git ls-tree *)",
+      "Bash(git rebase *)",
+      "Bash(git stash *)"
     ]
   }
 }
