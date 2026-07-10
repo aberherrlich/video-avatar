@@ -22,11 +22,9 @@
       "**/.vscode-server": true
     },
     "search.exclude": {
-      "**/.git": true,
       "**/.vscode-server": true,
       "**/node_modules": true
-    },
-    "git.enabled": false
+    }
   },
   "extensions": {
     "recommendations": [

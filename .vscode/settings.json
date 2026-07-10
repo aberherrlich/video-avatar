@@ -87,9 +87,6 @@
 
   "terminal.integrated.defaultProfile.linux": "bash",
 
-  "git.enabled": false,
-  "git.ignoreMissingGitWarning": true,
-
   "liveSassCompile.settings.formats": [
     {
       "format": "compressed",

@@ -17,7 +17,9 @@
       "Bash(git fetch *)",
       "Bash(git ls-tree *)",
       "Bash(git rebase *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(python3 -c \"import json,re; s=open\\('.vscode/settings.json'\\).read\\(\\); s2=re.sub\\(r',\\(\\\\s*[}\\\\]]\\)', r'\\\\1', s\\); json.loads\\(s2\\); print\\('valid JSON \\(comments/trailing-comma tolerant check\\)'\\)\")",
+      "Bash(python3 -c \"import json,re; s=open\\('test-avatar-v1.7.code-workspace'\\).read\\(\\); s2=re.sub\\(r',\\(\\\\s*[}\\\\]]\\)', r'\\\\1', s\\); json.loads\\(s2\\); print\\('valid JSON'\\)\")"
     ]
   }
 }
