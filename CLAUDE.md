@@ -10,7 +10,7 @@ A self-contained, embeddable circular video player for Hypoport. Fixed bottom-ri
 - No emojis in responses.
 - No anticipating needs — answer the actual request only.
 - Don't restate the user's question.
-- **Language:** English for all code (variables, functions, comments). German UI labels (`Minimieren`, `Stummschalten`, `Maximieren`) are intentional — preserve them. Reply in German only when the user writes in German. Technical explanations stay English unless asked otherwise.
+- **Language:** English is the base language — code (variables, functions, comments), documentation, and all responses. This is the default; don't switch away from it because the user's message happens to contain German. Reply in German only when the user explicitly asks for German or writes their request entirely in German. Even then, technical explanations stay English unless asked otherwise. German UI labels (`Minimieren`, `Stummschalten`, `Maximieren`) are intentional — preserve them.
 
 ## Certainty labeling
 

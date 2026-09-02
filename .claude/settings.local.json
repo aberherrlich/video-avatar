@@ -19,7 +19,21 @@
       "Bash(git rebase *)",
       "Bash(git stash *)",
       "Bash(python3 -c \"import json,re; s=open\\('.vscode/settings.json'\\).read\\(\\); s2=re.sub\\(r',\\(\\\\s*[}\\\\]]\\)', r'\\\\1', s\\); json.loads\\(s2\\); print\\('valid JSON \\(comments/trailing-comma tolerant check\\)'\\)\")",
-      "Bash(python3 -c \"import json,re; s=open\\('test-avatar-v1.7.code-workspace'\\).read\\(\\); s2=re.sub\\(r',\\(\\\\s*[}\\\\]]\\)', r'\\\\1', s\\); json.loads\\(s2\\); print\\('valid JSON'\\)\")"
+      "Bash(python3 -c \"import json,re; s=open\\('test-avatar-v1.7.code-workspace'\\).read\\(\\); s2=re.sub\\(r',\\(\\\\s*[}\\\\]]\\)', r'\\\\1', s\\); json.loads\\(s2\\); print\\('valid JSON'\\)\")",
+      "Bash(git commit -m ' *)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -c \"import sass; print\\('libsass ok'\\)\")",
+      "Read(//usr/local//**)",
+      "Bash(command -v dart-sass sassc)",
+      "Bash(echo \"=== exit $? ===\")",
+      "Bash(git diff *)",
+      "Bash(python3 -)",
+      "Bash(cd /tmp *)",
+      "Read(//tmp/**)",
+      "Bash(python3 -c \"s=open\\('scss/base.scss'\\).read\\(\\); print\\('braces:', s.count\\('{'\\)-s.count\\('}'\\)\\)\")",
+      "Bash(timeout 20 git ls-remote --heads origin)",
+      "Bash(timeout 20 ssh -o StrictHostKeyChecking=no -o BatchMode=yes -T git@github.com)",
+      "Bash(timeout 25 git ls-remote --heads origin)"
     ]
   }
 }

@@ -60,28 +60,114 @@
                     </g>
                 </svg>
             </button>
+
+            <!-- -> ai disclosure — styling/animation only, no click handler wired yet -->
+            <button class="video-guide__controls-btn video-guide__controls-btn--info"
+                id="vg-btn-info"
+                aria-label="Hinweis zu KI-generierten Inhalten"
+                title="Hinweis zu KI-generierten Inhalten">
+                <!-- official ai-disclosure label, letterforms only. path data is
+                     verbatim from the supplied file; everything around it changed:
+                     1. the disc path is dropped. the goal is white "AI" sitting
+                        directly on the button, and the button already provides a
+                        circle — a second one inside it just reads as a badge on a
+                        badge.
+                     2. the <defs><style> block is gone. an inline <style> inside
+                        inline svg is NOT scoped to that svg, it applies to the
+                        whole document, and its generic .cls-1 / .cls-2 names
+                        would have leaked fills onto any host page element using
+                        those classes. this widget is injected into pages we do
+                        not control. fill now comes from base.scss.
+                     3. viewBox replaced. the original "0 0 566.93 566.93" put the
+                        letterforms 20.11 units left of centre — invisible while
+                        the disc was there to anchor the eye, obvious without it.
+                        the new box is square and centred on the glyph's own
+                        bbox: x 166.56..360.14, y 212.73..353.74, centre
+                        (263.35, 283.24).
+                        the 265 side is padding, and it is what keeps this icon
+                        the same apparent size as its neighbours. "AI" is a wide
+                        1.37:1 mark while play and pause are taller than wide, so
+                        matching heights made it far broader than anything else
+                        on the ring. 265 lands its ink area on the mean of the
+                        other three: at the current 24px svg box that is 224px^2
+                        against play 192, pause 175 and volume 308.
+                        the side is a ratio, so this match holds at any svg size —
+                        it survived the 28px → 24px change untouched. shrink the
+                        side to enlarge the glyph.
+                     4. id="Calque_1" and data-name dropped — illustrator cruft,
+                        and a fixed id can collide on the host page. -->
+                <svg class="video-guide__ai-label" xmlns="http://www.w3.org/2000/svg"
+                    viewBox="130.85 150.74 265 265" width="28" height="28"
+                    aria-hidden="true">
+                    <path class="video-guide__ai-label-mark"
+                        d="M170.79,353.74c-1.08,0-2.05-.43-2.92-1.31-.88-.87-1.31-1.84-1.31-2.92,0-.67.07-1.27.2-1.81l47.34-129.32c.4-1.48,1.24-2.79,2.52-3.93,1.27-1.14,3.05-1.71,5.34-1.71h29.81c2.28,0,4.06.57,5.34,1.71,1.27,1.14,2.11,2.45,2.52,3.93l47.14,129.32c.27.54.4,1.14.4,1.81,0,1.08-.44,2.05-1.31,2.92s-1.91,1.31-3.12,1.31h-24.78c-2.01,0-3.52-.5-4.53-1.51-1.01-1.01-1.65-1.91-1.91-2.72l-7.86-20.55h-53.78l-7.65,20.55c-.27.81-.88,1.71-1.81,2.72-.94,1.01-2.55,1.51-4.83,1.51h-24.78ZM218.13,299.96h37.47l-18.93-53.18-18.53,53.18Z"></path>
+                    <path class="video-guide__ai-label-mark"
+                        d="M328.11,353.74c-1.48,0-2.69-.47-3.63-1.41-.94-.94-1.41-2.15-1.41-3.63v-130.93c0-1.48.47-2.68,1.41-3.63s2.15-1.41,3.63-1.41h26.99c1.48,0,2.68.47,3.63,1.41.94.94,1.41,2.15,1.41,3.63v130.93c0,1.48-.47,2.69-1.41,3.63-.94.94-2.15,1.41-3.63,1.41h-26.99Z"></path>
+                </svg>
+            </button>
+
+            <!-- -> ai disclosure pill
+                 stacked UNDER the info button and revealed by hovering it. must be
+                 a sibling, not a child: a child cannot paint below its parent's
+                 own background, and the whole effect depends on the button's
+                 circle covering the pill's left cap.
+                 it also has to come AFTER the button in the dom — css has no
+                 previous-sibling combinator, so the hover rule needs `--info:hover
+                 ~ pill`. paint order is corrected with z-index instead.
+                 the word is the same official artwork, letterforms only; "AI" is
+                 already on the button, so only "GENERATED" is needed here. -->
+            <div class="video-guide__ai-pill" aria-hidden="true">
+                <svg class="video-guide__ai-word" xmlns="http://www.w3.org/2000/svg"
+                    viewBox="598.36 229 870.31 96.87" width="84" height="9.35"
+                    aria-hidden="true">
+                    <path class="video-guide__ai-word-mark" d="M639.25,325.87c-8.43,0-15.63-1.41-21.59-4.24-5.97-2.83-10.58-6.95-13.86-12.38-3.27-5.42-5.04-11.99-5.31-19.71-.09-3.86-.13-7.98-.13-12.38s.04-8.56.13-12.51c.27-7.53,2.04-13.94,5.31-19.24,3.27-5.29,7.94-9.35,13.99-12.17,6.05-2.83,13.2-4.24,21.46-4.24,6.64,0,12.46.85,17.49,2.56,5.02,1.7,9.24,3.92,12.65,6.66,3.41,2.74,6.01,5.72,7.8,8.95,1.79,3.23,2.74,6.32,2.83,9.28,0,.81-.27,1.5-.81,2.08-.54.58-1.26.87-2.15.87h-16.68c-.9,0-1.59-.18-2.08-.54-.49-.36-.92-.9-1.28-1.61-.63-1.61-1.64-3.25-3.03-4.91-1.39-1.66-3.25-3.07-5.58-4.24-2.33-1.16-5.38-1.75-9.15-1.75-5.65,0-10.11,1.48-13.39,4.44-3.27,2.96-5.04,7.8-5.31,14.53-.27,7.71-.27,15.56,0,23.54.27,7,2.08,12.02,5.45,15.07,3.36,3.05,7.87,4.57,13.52,4.57,3.68,0,6.97-.65,9.89-1.95,2.91-1.3,5.22-3.34,6.93-6.12,1.7-2.78,2.56-6.32,2.56-10.63v-3.36h-14.66c-.9,0-1.66-.34-2.29-1.01-.63-.67-.94-1.46-.94-2.35v-8.61c0-.99.31-1.79.94-2.42.63-.63,1.39-.94,2.29-.94h32.96c.99,0,1.79.31,2.42.94.63.63.94,1.44.94,2.42v14.66c0,7.71-1.68,14.31-5.04,19.78-3.36,5.47-8.16,9.66-14.39,12.58-6.23,2.92-13.52,4.37-21.86,4.37Z"></path>
+                    <path class="video-guide__ai-word-mark" d="M710.73,324.52c-.99,0-1.79-.31-2.42-.94-.63-.63-.94-1.43-.94-2.42v-87.44c0-.99.31-1.79.94-2.42s1.43-.94,2.42-.94h60.94c.99,0,1.79.32,2.42.94.63.63.94,1.44.94,2.42v10.76c0,.9-.32,1.66-.94,2.29-.63.63-1.44.94-2.42.94h-43.59v21.12h40.63c.99,0,1.79.32,2.42.94.63.63.94,1.44.94,2.42v9.95c0,.9-.32,1.66-.94,2.29s-1.44.94-2.42.94h-40.63v21.79h44.66c.99,0,1.79.32,2.42.94.63.63.94,1.44.94,2.42v10.63c0,.99-.32,1.79-.94,2.42s-1.44.94-2.42.94h-62.02Z"></path>
+                    <path class="video-guide__ai-word-mark" d="M805.88,324.52c-.99,0-1.79-.31-2.42-.94-.63-.63-.94-1.43-.94-2.42v-87.44c0-.99.31-1.79.94-2.42s1.43-.94,2.42-.94h12.24c1.34,0,2.33.32,2.96.94.63.63,1.03,1.12,1.21,1.48l35.92,56.1v-55.15c0-.99.31-1.79.94-2.42s1.39-.94,2.29-.94h13.72c.99,0,1.79.32,2.42.94.63.63.94,1.44.94,2.42v87.44c0,.9-.32,1.68-.94,2.35-.63.67-1.44,1.01-2.42,1.01h-12.38c-1.35,0-2.31-.34-2.89-1.01-.58-.67-1.01-1.14-1.28-1.41l-35.78-54.35v53.41c0,.99-.32,1.79-.94,2.42s-1.44.94-2.42.94h-13.59Z"></path>
+                    <path class="video-guide__ai-word-mark" d="M912.19,324.52c-.99,0-1.79-.31-2.42-.94-.63-.63-.94-1.43-.94-2.42v-87.44c0-.99.31-1.79.94-2.42s1.43-.94,2.42-.94h60.94c.99,0,1.79.32,2.42.94.63.63.94,1.44.94,2.42v10.76c0,.9-.32,1.66-.94,2.29-.63.63-1.44.94-2.42.94h-43.59v21.12h40.63c.99,0,1.79.32,2.42.94.63.63.94,1.44.94,2.42v9.95c0,.9-.32,1.66-.94,2.29s-1.44.94-2.42.94h-40.63v21.79h44.66c.99,0,1.79.32,2.42.94.63.63.94,1.44.94,2.42v10.63c0,.99-.32,1.79-.94,2.42s-1.44.94-2.42.94h-62.02Z"></path>
+                    <path class="video-guide__ai-word-mark" d="M1007.35,324.52c-.99,0-1.79-.31-2.42-.94-.63-.63-.94-1.43-.94-2.42v-87.44c0-.99.31-1.79.94-2.42s1.43-.94,2.42-.94h35.65c11.21,0,20.04,2.58,26.5,7.74,6.46,5.16,9.69,12.58,9.69,22.26,0,6.55-1.57,12.02-4.71,16.41-3.14,4.4-7.35,7.67-12.65,9.82l18.97,33.63c.27.54.4,1.03.4,1.48,0,.72-.27,1.37-.81,1.95-.54.58-1.21.88-2.02.88h-14.93c-1.61,0-2.82-.42-3.63-1.28-.81-.85-1.39-1.63-1.75-2.35l-16.41-30.8h-16.28v31.07c0,.99-.32,1.79-.94,2.42s-1.44.94-2.42.94h-14.66ZM1025.38,273h17.22c4.93,0,8.59-1.12,10.96-3.36,2.38-2.24,3.56-5.38,3.56-9.42s-1.17-7.22-3.5-9.55c-2.33-2.33-6.01-3.5-11.03-3.5h-17.22v25.83Z"></path>
+                    <path class="video-guide__ai-word-mark" d="M1100.62,324.52c-.81,0-1.48-.29-2.02-.88-.54-.58-.81-1.23-.81-1.95,0-.45.04-.85.13-1.21l32.02-86.5c.27-.99.81-1.84,1.61-2.56.81-.72,1.93-1.08,3.36-1.08h17.22c1.43,0,2.56.36,3.36,1.08.81.72,1.35,1.57,1.61,2.56l32.02,86.5c.09.36.13.76.13,1.21,0,.72-.27,1.37-.81,1.95-.54.58-1.21.88-2.02.88h-13.99c-1.35,0-2.33-.31-2.96-.94-.63-.63-1.03-1.21-1.21-1.75l-5.78-15.07h-37.94l-5.78,15.07c-.18.54-.58,1.12-1.21,1.75-.63.63-1.61.94-2.96.94h-13.99ZM1129.54,289.41h27.85l-13.86-38.74-13.99,38.74Z"></path>
+                    <path class="video-guide__ai-word-mark" d="M1225.64,324.52c-.99,0-1.79-.31-2.42-.94-.63-.63-.94-1.43-.94-2.42v-72.1h-24.48c-.9,0-1.66-.31-2.29-.94-.63-.63-.94-1.39-.94-2.29v-12.11c0-.99.31-1.79.94-2.42s1.39-.94,2.29-.94h70.49c.99,0,1.79.32,2.42.94.63.63.94,1.44.94,2.42v12.11c0,.9-.32,1.66-.94,2.29s-1.44.94-2.42.94h-24.35v72.1c0,.99-.32,1.79-.94,2.42s-1.44.94-2.42.94h-14.93Z"></path>
+                    <path class="video-guide__ai-word-mark" d="M1298.32,324.52c-.99,0-1.79-.31-2.42-.94-.63-.63-.94-1.43-.94-2.42v-87.44c0-.99.31-1.79.94-2.42s1.43-.94,2.42-.94h60.94c.99,0,1.79.32,2.42.94.63.63.94,1.44.94,2.42v10.76c0,.9-.32,1.66-.94,2.29-.63.63-1.44.94-2.42.94h-43.59v21.12h40.63c.99,0,1.79.32,2.42.94.63.63.94,1.44.94,2.42v9.95c0,.9-.32,1.66-.94,2.29s-1.44.94-2.42.94h-40.63v21.79h44.66c.99,0,1.79.32,2.42.94.63.63.94,1.44.94,2.42v10.63c0,.99-.32,1.79-.94,2.42s-1.44.94-2.42.94h-62.02Z"></path>
+                    <path class="video-guide__ai-word-mark" d="M1393.48,324.52c-.99,0-1.79-.31-2.42-.94-.63-.63-.94-1.43-.94-2.42v-87.44c0-.99.31-1.79.94-2.42s1.43-.94,2.42-.94h33.77c8.97,0,16.46,1.41,22.46,4.24,6.01,2.83,10.6,6.95,13.79,12.38,3.18,5.43,4.86,12.13,5.04,20.11.09,3.95.13,7.4.13,10.36s-.05,6.37-.13,10.22c-.27,8.34-1.93,15.25-4.98,20.72-3.05,5.47-7.53,9.53-13.45,12.17-5.92,2.65-13.32,3.97-22.2,3.97h-34.44ZM1411.51,307.17h15.74c4.48,0,8.16-.67,11.03-2.02,2.87-1.35,5-3.47,6.39-6.39,1.39-2.91,2.13-6.7,2.22-11.37.09-2.6.16-4.93.2-7,.04-2.06.04-4.12,0-6.19-.05-2.06-.11-4.35-.2-6.86-.18-6.73-1.91-11.68-5.18-14.87-3.27-3.18-8.32-4.78-15.13-4.78h-15.07v59.46Z"></path>
+                </svg>
+            </div>
         </div>
 
         <div class="video-guide__content-hotspot" aria-hidden="true"></div>
     </div>
 
-    <div class="video-guide__loader" aria-hidden="true">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 48 48" width="28" height="28" aria-hidden="true">
-            <path fill="#ffffff" d="M27.855 3.998c-1.7489 -2.90619 -5.9623 -2.90619 -7.7112 0l-5.1678 8.5871c-0.2095 0.348 -0.5511 0.5962 -0.9468 0.6879l-9.76376 2.2613c-3.304406 0.7653 -4.606401 4.7724 -2.38291 7.3338l6.56989 7.5685c0.26626 0.3067 0.39675 0.7083 0.36163 1.113l-0.86654 9.9846c-0.29327 3.3792 3.11539 5.8557 6.23859 4.5326l9.2282 -3.9096c0.374 -0.1584 0.7962 -0.1584 1.1702 0l9.2283 3.9096c3.1231 1.3231 6.5318 -1.1534 6.2385 -4.5326l-0.8665 -9.9846c-0.0352 -0.4047 0.0953 -0.8063 0.3616 -1.113l6.5699 -7.5685c2.2235 -2.5614 0.9215 -6.5685 -2.3829 -7.3338l-9.7638 -2.2613c-0.3957 -0.0917 -0.7373 -0.3399 -0.9468 -0.6879L27.855 3.998Z" stroke-width="1"></path>
+    <!-- -> intro loader -->
+    <!-- stand-in for the widget during the intro: circle + voice-chat glyph, a
+         red badge that pops in and out, and a ring that pings past the circle's
+         edge. all three are driven by css keyframes, gated behind
+         .js-loader-loading so nothing runs while the widget is still off-screen.
+         the ring is its own element rather than a border on the loader because it
+         has to expand beyond the circle. -->
+    <div class="video-guide__loader" id="vg-loader" aria-hidden="true">
+        <span class="video-guide__loader-ring" aria-hidden="true"></span>
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" height="28" width="28"
+            aria-hidden="true">
+            <g id="voice-chat-alt">
+                <path id="Union" fill="#000000"
+                    d="M12.0002 2c5.5228 0.00015 10 4.47725 10 10 0 5.5228 -4.4772 9.9998 -10 10 -1.5465 0 -3.01295 -0.353 -4.32222 -0.9814L2.78247 22.459c-0.35101 0.1032 -0.7305 0.0067 -0.98926 -0.252s-0.35521 -0.6382 -0.25195 -0.9892l1.43945 -4.8965c-0.62818 -1.309 -0.98047 -2.7752 -0.98047 -4.3213 0 -5.52285 4.47716 -10 9.99996 -10m0 2c-4.41823 0 -7.99996 3.58172 -7.99996 8 0 1.359 0.33781 2.6363 0.9336 3.7549 0.12301 0.231 0.15097 0.5018 0.07715 0.7529l-1.03516 3.5156 3.5166 -1.0341 0.0957 -0.0235c0.22292 -0.0423 0.45525 -0.007 0.65723 0.1006C9.36391 19.6621 10.6413 20 12.0002 20c4.4182 -0.0002 8 -3.5818 8 -8 0 -4.41818 -3.5818 -7.99985 -8 -8m0 4c0.5522 0.00015 1 0.44781 1 1v6c0 0.5522 -0.4478 0.9998 -1 1 -0.5522 0 -1 -0.4477 -1 -1V9c0 -0.55228 0.4478 -1 1 -1m-3.24996 2c0.55216 0.0002 1 0.4478 1 1v2c0 0.5522 -0.44784 0.9998 -1 1 -0.55228 0 -1 -0.4477 -1 -1v-2c0 -0.5523 0.44772 -1 1 -1m6.49996 0c0.5522 0.0002 1 0.4478 1 1v2c0 0.5522 -0.4478 0.9998 -1 1 -0.5522 0 -1 -0.4477 -1 -1v-2c0 -0.5523 0.4478 -1 1 -1"
+                    stroke-width="1"></path>
+            </g>
         </svg>
+        <!-- two elements on purpose: the outer span rides the balloon (transform
+             owned by vg-loader-grow), the inner one pops from scale 0 (transform
+             owned by vg-loader-badge-reveal). one element cannot do both — a
+             second animation on the same property just overwrites the first. -->
+        <span class="video-guide__loader-badge" aria-hidden="true">
+            <span class="video-guide__loader-badge-dot">1</span>
+        </span>
     </div>
 
-
     <div class="video-guide__toggle" id="vg-toggle">
-                <div class="video-guide__splash" id="vg-splash">
+        <!-- js-splash-expanded is the minimized widget's resting size (128×128).
+             set here rather than left to js: without it the splash falls back to
+             shrink-to-fit and the intro would land on an accidental size. -->
+        <div class="video-guide__splash js-splash-expanded" id="vg-splash">
             <img class="video-guide__splash-avatar" src="sample/sample-splash_image-aline-shrink.jpg" alt="Video Guide Präsentatorin Aline">
-            <div class="video-guide__chat-bubble"
-                role="status"
-                aria-live="polite"
-                aria-atomic="true"
-                aria-hidden="true">
-                <p class="video-guide__chat-bubble-text">Hallo, ich bin Aline und helfe dir gern weiter wenn du Fragen hast.</p>
-            </div>
         </div>
         <button class="video-guide__toggle-btn video-guide__toggle-btn--minimize"
             id="vg-btn-minimize"
@@ -97,5 +183,30 @@
             </svg>
         </button>
 
+    </div>
+
+    <!-- -> chat bubble -->
+    <!-- sibling of __toggle on purpose: the toggle's clip-path: circle(50%) would
+         trim the overhang away, and __splash collapses to 0x0 while expanded -->
+    <div class="video-guide__chat-bubble"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        aria-hidden="true">
+        <p class="video-guide__chat-bubble-text">Hallo, ich bin Aline und helfe dir gern weiter wenn du Fragen hast.</p>
+
+        <button class="video-guide__chat-bubble-close"
+            id="vg-btn-bubble-close"
+            aria-label="Hinweis schließen"
+            title="Hinweis schließen">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" height="24" width="24"
+                aria-hidden="true">
+                <g id="close">
+                    <path id="Union" fill="#000000"
+                        d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"
+                        stroke-width=".5"></path>
+                </g>
+            </svg>
+        </button>
     </div>
 </div>

@@ -3,7 +3,9 @@
  *
  * purpose: main video widget functionality - controls, state management, progress animation
  * dependencies: none (vanilla JS — no jQuery)
- * key functions: initVideoGuide(), setPercentage(), getRingProgress(), showBubble(), scheduleBubble()
+ * key functions: initVideoGuide(), setPercentage(), getRingProgress(), showBubble(),
+ *                scheduleBubble(), scheduleBubbleHide(), runReveal(), revealInstant(),
+ *                finishReveal(), publishRevealTiming()
  * event listeners: videoGuideWidgetLoaded (initialization trigger from widget-loader.js)
  *
  * architecture: waits for custom 'videoGuideWidgetLoaded' event before initializing.
@@ -12,9 +14,47 @@
 
 // -> configuration
 
-// extra delay after window.load before the widget reveals itself (milliseconds).
+// pre-roll delay after window.load before runReveal() fires (milliseconds).
 // increase if the host page or iframe needs more time to settle visually.
 const REVEAL_DELAY_MS = 1500;
+
+// -> intro reveal timing (milliseconds unless noted)
+// single source of truth for the intro: runReveal() pushes every value onto
+// .video-guide as a css custom property, so the js waits below and the css
+// durations/iteration counts in base.scss can never drift apart. tune the whole
+// intro from here.
+//
+// full sequence, measured from runReveal():
+//   0                                widget rises from below the viewport
+//   slideIn                          loader starts pulsing
+//   slideIn + cycle * loops          the delivering inflation begins
+//   slideIn + cycle * (loops + 1)    widget goes opaque, loader dissolves onto it
+//   + dissolve                       loader out of layout, greeting armed
+//
+// the loader pulses `loaderLoops` times and then inflates once more — but that
+// last inflation does not burst. it keeps expanding to the widget's own size and
+// becomes it.
+//
+// the delivering inflation is exactly one cycle long, which is why there is no
+// separate duration for it. that equality is load-bearing: it lets the deliver
+// keyframes reuse the pulse's own 58% and 74% marks verbatim, so the two phases
+// cannot drift no matter what loaderCycle is set to. before, those percentages
+// had to be rederived by hand every time the tempo changed.
+// loaderLoops counts the *pulses*, so the number of expanding rounds the visitor
+// sees is loaderLoops + 1 — the delivering inflation is a round of its own.
+const REVEAL = {
+	slideIn:     700,   // below the viewport → anchored, spring-in easing
+	loaderCycle: 3150,  // one pulse: inflate 1827 + hold 504 + burst/rebound 819
+	loaderLoops: 2,     // pulses before the delivery → 3 expanding rounds total
+	dissolve:    600    // loader circle fades onto the avatar underneath it
+};
+
+// -> chat bubble timing
+// the greeting appears unprompted exactly once per page view and then stays put.
+// it is never dismissed by a timer — only by the visitor hovering the widget and
+// moving away again, or by opening the widget. see scheduleBubble().
+const BUBBLE_DELAY_MS      = 3000; // wait after widget reveal before greeting
+const BUBBLE_HIDE_GRACE_MS = 250;  // grace period when the cursor leaves avatar/bubble
 
 // -> initialization
 
@@ -46,9 +86,9 @@ function initVideoGuide() {
 	const splashEl          = document.getElementById('vg-splash');
 	const toggleEl          = document.getElementById('vg-toggle');
 	const chatBubble        = document.querySelector('.video-guide__chat-bubble');
-	const loader            = document.querySelector('.video-guide__loader');
-	const loaderIcon        = loader ? loader.querySelector('svg') : null;
+	const bubbleCloseBtn    = document.getElementById('vg-btn-bubble-close');
 	const progressGrabber   = document.querySelector('.video-guide__progress-grabber');
+	const loader            = document.getElementById('vg-loader');
 
 	// -> null guard
 	// abort immediately if any critical element is missing (e.g. widget.html not loaded)
@@ -61,13 +101,20 @@ function initVideoGuide() {
 
 	// -> state
 
-	let progressRafId  = null; // requestAnimationFrame handle for progress loop
-	let bubbleTimerId  = null; // setTimeout handle for chat bubble auto-reveal
-	let idleTimerId    = null; // setTimeout handle for toggle auto-hide while expanded
+	let progressRafId     = null;  // requestAnimationFrame handle for progress loop
+	let bubbleTimerId     = null;  // setTimeout handle for chat bubble auto-reveal
+	let bubbleHideTimerId = null;  // setTimeout handle for the grace period before hiding the bubble
+	let idleTimerId       = null;  // setTimeout handle for toggle auto-hide while expanded
+	let inTriggerZone     = false; // whether cursor is currently over the hotspot/toggle zone
+	let autoGreetingSpent = false; // the unprompted greeting has had its one turn
+	let bubbleHoverArmed  = true;  // false while a resize-induced mouseenter is possible
+	let bubbleDismissed   = false; // visitor closed the bubble — never show it again
 
 	// -> chat bubble helpers
 
 	function showBubble() {
+		if (bubbleDismissed) return; // single choke point — covers auto reveal and hover alike
+		clearTimeout(bubbleHideTimerId);
 		chatBubble.classList.add('js-bubble-visible');
 		chatBubble.setAttribute('aria-hidden', 'false');
 	}
@@ -77,14 +124,63 @@ function initVideoGuide() {
 		chatBubble.setAttribute('aria-hidden', 'true');
 	}
 
+	/**
+	 * scheduleBubble()
+	 * purpose: arm the one unprompted greeting allowed per page view
+	 * input: none
+	 * output: none — reveals the bubble after BUBBLE_DELAY_MS and leaves it up
+	 * note: deliberately has no dismiss timer. the greeting waits for the visitor
+	 *       instead of expiring on them. it goes away when they hover the widget
+	 *       and move off again, or when they open the widget.
+	 *       no-op once the greeting has had its turn, so it can never pop up
+	 *       unprompted a second time. hover reveals call showBubble() directly and
+	 *       are not limited.
+	 */
 	function scheduleBubble() {
+		if (autoGreetingSpent) return;
 		clearTimeout(bubbleTimerId);
-		bubbleTimerId = setTimeout(showBubble, 3000);
+		bubbleTimerId = setTimeout(function() {
+			autoGreetingSpent = true;
+			showBubble();
+		}, BUBBLE_DELAY_MS);
 	}
 
+	/**
+	 * scheduleBubbleHide()
+	 * purpose: hide the bubble after a short grace period instead of immediately
+	 * why: the bubble is clickable and sits away from the avatar, so the cursor has
+	 *      to cross a gap to reach it. hiding on the avatar's mouseleave would pull
+	 *      it away mid-journey. cancelled by the bubble's own mouseenter.
+	 */
+	function scheduleBubbleHide() {
+		clearTimeout(bubbleHideTimerId);
+		bubbleHideTimerId = setTimeout(hideBubble, BUBBLE_HIDE_GRACE_MS);
+	}
+
+	/**
+	 * cancelBubble()
+	 * purpose: hide the bubble and retire the unprompted greeting for good
+	 * called when the visitor engages with the widget — once they've opened it,
+	 * the greeting has served its purpose and must not reappear
+	 */
 	function cancelBubble() {
+		autoGreetingSpent = true;
 		clearTimeout(bubbleTimerId);
+		clearTimeout(bubbleHideTimerId);
 		hideBubble();
+	}
+
+	/**
+	 * dismissBubble()
+	 * purpose: close the greeting permanently for this page view
+	 * input: none
+	 * output: none — hides the bubble and blocks every future reveal
+	 * differs from hideBubble(): a dismissed bubble does not come back on hover.
+	 * closing something explicitly and having it return on hover reads as broken.
+	 */
+	function dismissBubble() {
+		bubbleDismissed = true;
+		cancelBubble();
 	}
 
 	// -> progress ring animation
@@ -235,9 +331,10 @@ function initVideoGuide() {
 		if (toggleEl) toggleEl.classList.remove('js-toggle-idle');
 	}
 
-	function scheduleToggleHide() {
+	function scheduleToggleHide(isFirstReveal = false) {
 		clearTimeout(idleTimerId);
-		idleTimerId = setTimeout(hideToggle, 250);
+		const delay = isFirstReveal ? 3000 : 250;
+		idleTimerId = setTimeout(hideToggle, delay);
 	}
 
 	function cancelToggleHide() {
@@ -251,7 +348,8 @@ function initVideoGuide() {
 		splashEl.classList.replace('js-splash-expanded', 'js-splash-minimized');
 		if (toggleEl) toggleEl.classList.add('js-toggle-revealed');
 		if (contentEl) contentEl.classList.replace('js-content-minimized', 'js-content-expanded');
-		scheduleToggleHide();
+		inTriggerZone = false; // reset stale hotspot state from previous round
+		scheduleToggleHide(true);
 	}
 
 	function collapseWidget() {
@@ -264,9 +362,16 @@ function initVideoGuide() {
 		}
 		if (contentEl) contentEl.classList.replace('js-content-expanded', 'js-content-minimized');
 
+		// the splash snaps back to 128x128 and lands under a cursor that has not
+		// moved — the visitor just clicked minimize in the corner. the browser
+		// re-runs hit testing, fires mouseenter on the splash, and the greeting
+		// pops straight back up. suppress hover reveals until the collapse settles.
+		bubbleHoverArmed = false;
+
 		// remove toggling class after animations complete (longest animation is 0.75s total)
 		setTimeout(function() {
 			if (toggleEl) toggleEl.classList.remove('js-toggle-toggling');
+			bubbleHoverArmed = true;
 		}, 1000);
 	}
 
@@ -295,8 +400,6 @@ function initVideoGuide() {
 	// a spurious hide while the cursor sits still.
 
 	if (contentHotspot && toggleEl) {
-		let inTriggerZone = false;
-
 		function pointInRect(x, y, rect) {
 			return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
 		}
@@ -320,15 +423,47 @@ function initVideoGuide() {
 		});
 	}
 
-	// show bubble immediately on hover, re-arm timer on leave
+	// -> bubble hover reveal
+	// hover is on-demand and unlimited. it deliberately does NOT re-arm the
+	// unprompted greeting — brushing past the widget used to start a fresh 3s
+	// countdown, so the bubble could pop up over and over on one page view.
+
 	splashEl.addEventListener('mouseenter', function() {
+		if (!bubbleHoverArmed) return; // the widget resized under a still cursor
+		clearTimeout(bubbleTimerId);   // an early hover pre-empts the auto greeting
 		showBubble();
-		clearTimeout(bubbleTimerId);
 	});
 
 	splashEl.addEventListener('mouseleave', function() {
-		hideBubble();
-		scheduleBubble();
+		bubbleHoverArmed = true; // a real exit — hover reveals are welcome again
+		scheduleBubbleHide();    // grace period — the cursor may be heading for the bubble
+	});
+
+	// -> chat bubble interaction
+	// the bubble is a click target of its own: it no longer sits inside #vg-splash,
+	// so it can't rely on clicks bubbling up to the splash handler.
+
+	chatBubble.addEventListener('mouseenter', function() {
+		clearTimeout(bubbleTimerId);
+		showBubble(); // also cancels a pending hide
+	});
+
+	chatBubble.addEventListener('mouseleave', function() {
+		scheduleBubbleHide(); // grace period — avoids a flicker on the way to the avatar
+	});
+
+	chatBubble.addEventListener('click', function(e) {
+		e.preventDefault();
+		e.stopPropagation();
+		expandWidget();
+	});
+
+	// close button sits inside the bubble, so stopPropagation keeps its click from
+	// reaching the bubble handler above and opening the widget instead of closing
+	if (bubbleCloseBtn) bubbleCloseBtn.addEventListener('click', function(e) {
+		e.preventDefault();
+		e.stopPropagation();
+		dismissBubble();
 	});
 
 	// -> progress ring scrubbing
@@ -406,63 +541,158 @@ function initVideoGuide() {
 	setPercentage(0);
 	setPlayPauseIcon(false);
 
-	// -> loader icon attract interaction
-	// listens on document so cursor position is tracked outside the widget element.
-	// attraction zone: bottom-right quadrant (x > 50vw, y > 50vh).
-	// strength scales with proximity — closer = stronger pull, max offset 14px.
-	// outside the zone: css spring transition snaps icon back to center.
+	// -> reveal
 
-	if (loader && loaderIcon) {
-		const MAX_OFFSET = 14;
-
-		document.addEventListener('mousemove', function(e) {
-			if (loader.classList.contains('js-hidden')) return;
-
-			const inZone = e.clientX > window.innerWidth * 0.5 && e.clientY > window.innerHeight * 0.5;
-
-			if (!inZone) {
-				// outside zone — let css spring handle snap-back
-				if (loaderIcon.classList.contains('js-attracting')) {
-					loaderIcon.classList.remove('js-attracting');
-					loaderIcon.style.transform = 'translate(0, 0)';
-				}
-				return;
-			}
-
-			const rect    = loader.getBoundingClientRect();
-			const cx      = rect.left + rect.width  / 2;
-			const cy      = rect.top  + rect.height / 2;
-			const dx      = e.clientX - cx;
-			const dy      = e.clientY - cy;
-			const dist    = Math.sqrt(dx * dx + dy * dy) || 1;
-			// normalize against the diagonal of the attraction quadrant
-			const maxDist = Math.sqrt(
-				Math.pow(window.innerWidth  * 0.5, 2) +
-				Math.pow(window.innerHeight * 0.5, 2)
-			);
-			const strength = 1 - Math.min(dist / maxDist, 1);
-
-			// suppress spring transition while actively attracting
-			loaderIcon.classList.add('js-attracting');
-			loaderIcon.style.transform =
-				'translate(' +
-				(dx / dist * MAX_OFFSET * strength).toFixed(2) + 'px, ' +
-				(dy / dist * MAX_OFFSET * strength).toFixed(2) + 'px)';
-		});
+	/**
+	 * publishRevealTiming()
+	 * purpose: mirror the REVEAL config into css custom properties on the widget
+	 * input: none
+	 * output: none — sets --vg-reveal-slide / --vg-reveal-dissolve /
+	 *         --vg-loader-cycle / --vg-loader-cycles on .video-guide
+	 * why: base.scss declares the same four values as :root fallbacks. pushing the
+	 *      js numbers over them keeps the setTimeout waits and the css durations
+	 *      from drifting apart when someone retunes the intro.
+	 * note: there is no --vg-reveal-deliver. the deliver phase runs for exactly one
+	 *       --vg-loader-cycle, so it reads that one instead.
+	 *       --vg-toggle-fade is not set here either — it is a momentary override
+	 *       applied and removed inside runReveal()'s morph step, not config.
+	 */
+	function publishRevealTiming() {
+		widget.style.setProperty('--vg-reveal-slide',    REVEAL.slideIn     + 'ms');
+		widget.style.setProperty('--vg-reveal-dissolve', REVEAL.dissolve    + 'ms');
+		widget.style.setProperty('--vg-loader-cycle',    REVEAL.loaderCycle + 'ms');
+		widget.style.setProperty('--vg-loader-cycles',   String(REVEAL.loaderLoops));
 	}
 
-	// reveal after window.load + configurable extra delay (REVEAL_DELAY_MS)
-	window.addEventListener('load', function() {
+	/**
+	 * runReveal()
+	 * purpose: play the widget's intro — rise, pulse, deliver, morph
+	 * input: none
+	 * output: none — leaves the widget in its revealed, interactive end state
+	 * sequence: see the REVEAL config block at the top of this file for the
+	 *           measured timeline. .video-guide starts below the viewport via css,
+	 *           not js, so a page where this never runs shows nothing rather than a
+	 *           half-revealed widget.
+	 */
+	function runReveal() {
+		publishRevealTiming();
+
+		// visitors who asked for less motion get the end state, not the show
+		if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+			revealInstant();
+			return;
+		}
+
+		// step 1 — slide in from past the bottom-right corner. the loader is the
+		// only visible layer: __toggle and __content are still at opacity 0.
+		widget.classList.add('js-reveal-enter');
+
+		// step 2 — loader pulses REVEAL.loaderLoops times
+		setTimeout(function() {
+			if (loader) loader.classList.add('js-loader-loading');
+		}, REVEAL.slideIn);
+
+		// step 2b — the badge arrives one round before the delivery and stays for
+		// the rest of the intro, so it spans the last pulse and the delivering
+		// round both. it needs its own class because the pulse phase is a single
+		// animation with an iteration count: every iteration is identical, so
+		// there is no way to give only the last one a badge from inside it.
+		//
+		// this class is never removed, and the badge's animation is declared under
+		// it alone. that is what lets the reveal survive the pulse → deliver swap
+		// happening underneath it without restarting.
+		setTimeout(function() {
+			if (loader) loader.classList.add('js-loader-badge');
+		}, Math.max(REVEAL.slideIn,
+		            REVEAL.slideIn + REVEAL.loaderCycle * (REVEAL.loaderLoops - 1)));
+
+		// step 3 — the delivering inflation. the pulse class comes off and the
+		// deliver class goes on at a whole cycle boundary, where every animation's
+		// last keyframe already equals its element's base state — so the swap snaps
+		// nothing. see the invariant noted above .js-loader-loading in base.scss.
+		//
+		// the deliver phase opens with the same inflate and hold as a pulse, to the
+		// millisecond, so it is indistinguishable until the moment it would burst.
+		// then it expands to the widget's size instead.
+		const deliverAt = REVEAL.slideIn + REVEAL.loaderCycle * REVEAL.loaderLoops;
+
+		setTimeout(function() {
+			if (loader) {
+				loader.classList.remove('js-loader-loading');
+				loader.classList.add('js-loader-deliver');
+			}
+		}, deliverAt);
+
+		// step 4 — the morph. by now the loader's circle is an opaque 128px disc
+		// sitting exactly on the toggle's own 128px disc, same colour, same centre.
+		//
+		// the widget is revealed with its fade zeroed because it is completely
+		// hidden behind that disc: a 400ms fade nobody can see is 400ms of dead
+		// wall time. it must not be revealed any earlier either — while the loader
+		// is still smaller than 128px, the widget would show around it.
+		//
+		// this timer does not have to be frame-accurate. vg-loader-deliver finishes
+		// expanding at 90% of the cycle and then holds at 128px for the remaining
+		// 10%, so there is a whole 315ms window in which this can land and still
+		// find the disc at full size. that hold exists for exactly this reason.
+		const morphAt = deliverAt + REVEAL.loaderCycle;
+
+		setTimeout(function() {
+			widget.style.setProperty('--vg-toggle-fade', '0ms');
+			widget.classList.add('js-widget-ready');
+			if (loader) loader.classList.add('js-loader-out');
+		}, morphAt);
+
+		// step 5 — loader out of the layout, toggle's own fade handed back to the
+		// minimize/maximize flow, greeting armed
 		setTimeout(function() {
 			if (loader) loader.classList.add('js-hidden');
-			widget.classList.add('js-widget-ready');
-			// delay content fade-in by 1s relative to toggle — one-time only on reveal
-			if (contentEl) contentEl.style.transitionDelay = '1s';
-			setTimeout(function() {
-				if (contentEl) contentEl.style.transitionDelay = '';
-			}, 1400); // 1s delay + 0.4s fade duration
-			scheduleBubble();
-		}, REVEAL_DELAY_MS);
+			widget.style.removeProperty('--vg-toggle-fade');
+			finishReveal();
+		}, morphAt + REVEAL.dissolve);
+	}
+
+	/**
+	 * revealInstant()
+	 * purpose: land on the revealed end state with no intro animation
+	 * input: none
+	 * output: none — same end state runReveal() reaches the long way round
+	 * used by: the prefers-reduced-motion branch of runReveal()
+	 * note: zeroing the transition durations first is what suppresses the slide —
+	 *       .js-reveal-enter still changes the transform, it just has no time to
+	 *       animate. the loader never appears at all, so the deliver and dissolve
+	 *       phases are skipped outright rather than played instantly.
+	 */
+	function revealInstant() {
+		widget.style.setProperty('--vg-reveal-slide', '0ms');
+		widget.style.setProperty('--vg-reveal-dissolve', '0ms');
+
+		if (loader) loader.classList.add('js-hidden');
+		widget.classList.add('js-reveal-enter');
+		widget.classList.add('js-widget-ready');
+
+		// --vg-toggle-fade is deliberately left alone here. it exists to skip a fade
+		// the visitor cannot see because the loader's disc is covering it, and there
+		// is no loader in this path. the toggle's own 0.4s opacity fade stands: it is
+		// a fade, not motion, so reduced-motion has no quarrel with it.
+		finishReveal();
+	}
+
+	/**
+	 * finishReveal()
+	 * purpose: shared tail of every reveal variant, independent of how it animated
+	 * input: none
+	 * output: none — arms the one unprompted greeting
+	 * why separate: the greeting timing stays identical across animations, so it
+	 *               hangs off the end of the sequence instead of living inside it.
+	 */
+	function finishReveal() {
+		scheduleBubble();
+	}
+
+	// reveal after window.load + configurable pre-roll delay (REVEAL_DELAY_MS)
+	window.addEventListener('load', function() {
+		setTimeout(runReveal, REVEAL_DELAY_MS);
 	});
 
 }

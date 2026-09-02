@@ -2,10 +2,11 @@
  * base.scss
  *
  * purpose: complete widget styling with BEM methodology
- * components: container (.video-guide), progress ring, viewport, video, controls, buttons, splash, toggle
+ * components: container (.video-guide), intro loader, progress ring, viewport, video, controls,
+ *             buttons, splash, toggle, chat bubble
  * key patterns:
  *   - all four direct children of .video-guide are position: fixed, stacked at the same anchor
- *   - __content and __splash share 256×256px; __load-indicator and __toggle are 128×128px
+ *   - __content and __splash share 256×256px; __toggle is 128×128px
  *   - pointer-events layering (controls: none, buttons: auto)
  *   - z-index stacking (1: progress ring, 2: viewport/video, 3: controls) — within __content
  *   - state classes (.js-* prefix — toggled by JS, no styles of their own)
@@ -46,6 +47,25 @@
   /* Neutral */
   --vg-white: #ffffff;           /* White — viewport background, icon backgrounds */
   --vg-transparent: transparent; /* Transparent for border animations */
+
+  /* -> intro reveal timing
+     these are fallbacks. runReveal() in video-guide.js overwrites all four on
+     .video-guide from its REVEAL config object, so the js waits and the css
+     durations can never drift apart. keep the values here in sync with that
+     object anyway — they are what a page without js would use.
+
+     there is deliberately no --vg-reveal-deliver: the delivering inflation runs
+     for exactly one --vg-loader-cycle and reads that instead. */
+  --vg-reveal-slide:    700ms;  /* widget rises from below the viewport */
+  --vg-reveal-dissolve: 600ms;  /* loader circle fades onto the avatar */
+  --vg-loader-cycle:    3150ms; /* one pulse: inflate 1827 + hold 504 + burst 819 */
+  --vg-loader-cycles:   2;      /* pulses before the delivery → 3 rounds total */
+
+  /* opacity fade for __toggle. parameterised so the intro can zero it: during the
+     morph the toggle is completely hidden behind the loader's 128px disc, and a
+     fade nobody can see is only wasted wall time. the minimize/maximize flow uses
+     the default. */
+  --vg-toggle-fade: .4s;
 }
 
 // -> global resets
@@ -83,13 +103,43 @@ p {
   align-items: center;
   justify-content: center;
 
-  background-color: lightcoral;
+  /* debug: uncomment to see the widget's 256×256 box.
+  background-color: lightcoral; */
+
+  // -> intro start position
+  // the whole widget waits below the viewport's bottom edge until runReveal()
+  // adds .js-reveal-enter, then rises straight up into place. vertical only —
+  // no horizontal component, so it enters directly under its resting spot.
+  //
+  // 100% of the 256px box + the 64px bottom offset is exactly the distance that
+  // puts the widget's top edge flush with the viewport's bottom edge: no more
+  // than needed, so the travel stays as short as the effect allows.
+  //
+  // translateY, not translate: a one-argument translate() moves along X, which
+  // would send it sideways instead. the end state uses the same function so the
+  // transition interpolates a matching list rather than falling back to matrices.
+  //
+  // declared here rather than applied by js on purpose: if video-guide.js never
+  // initializes (e.g. the widget.html fetch resolves after window.load) the
+  // widget stays out of sight instead of flashing into place unanimated.
+  //
+  // fixed-position boxes are excluded from the viewport's scrollable overflow
+  // region, so parking one off-screen cannot introduce scrollbars.
+  transform: translateY(calc(100% + 64px));
+  transition: transform var(--vg-reveal-slide) cubic-bezier(0.34, 1.15, 0.64, 1);
+
+  &.js-reveal-enter {
+    transform: translateY(0);
+  }
 
   @media (max-width: 576px) {
     display: none;
   }
 
-  // -> content layer (video player)
+  // -> revealed end state
+  // the only rule that makes the widget interactive — __toggle and __content
+  // both start at opacity 0. set by runReveal() at the handoff, in the same tick
+  // the loader starts growing away, so the avatar fades up through it.
   &.js-widget-ready {
     .video-guide__toggle {
       opacity: 1;
@@ -137,6 +187,12 @@ p {
   width: 112px;
   height: 112px;
 
+  // needed so .video-guide__toggle can drop behind the video circle while the
+  // widget is expanded (see .js-toggle-revealed). this also makes __content a
+  // stacking context, which contains its 1/2/3 children — their order is
+  // unaffected, they just can no longer interleave with the toggle.
+  z-index: 2;
+
   opacity: 0;
 
   transition:
@@ -155,14 +211,6 @@ p {
     right: 32px;
     width: 224px;
     height: 224px;
-
-    .video-guide__controls-btn--volume {
-      transform: translateX(-50%) translateX(-26px) scale(1);
-    }
-
-    .video-guide__controls-btn--play {
-      transform: translateX(-50%) translateX(26px) scale(1);
-    }
   }
 }
 
@@ -178,44 +226,221 @@ p {
   width: 50%;
   height: 50%;
   pointer-events: none;
-
-  background: yellow; // testing only — remove in production
 }
 
-// -> loader
+// -> intro loader
+// the widget's stand-in during the intro. centered by .video-guide's flex box:
+// an absolutely positioned child with auto offsets resolves to its static
+// position, which the flex container has already centered.
+//
+// the element itself carries no background and no loading animation — it is only
+// the box everything else is anchored to. two reasons it stays out of the motion,
+// even though the fill, flash and glyph all scale together and could in principle
+// be driven from here:
+//   1. transform on .video-guide__loader is reserved for the handoff transition.
+//      a keyframe animation on the same property would outrank it.
+//   2. __ring and __badge are children too, and they must NOT ride the balloon —
+//      the ring pings on its own schedule, the badge would drift off its corner.
+//
+// layers, all gated behind .js-loader-loading so nothing runs while the widget
+// is still off-screen:
+//   ::before  circle fill   — background + shadow, grows and snaps back (grow)
+//   svg       glyph         — rides the same grow: a print on the balloon, not a
+//                             fixed badge sitting in front of it
+//   __ring    ping          — shockwave released by the collapse. expands past
+//                             the circle's edge, so it cannot be a border on the
+//                             fill, and it deliberately does NOT ride the grow
+//   ::after   rebound ring  — second, weaker wave, fired by the landing at 82%
+//                             rather than by the burst at 74%
+//   __badge   notification  — pops in with overshoot, holds, shrinks away
 
 .video-guide__loader {
   position: absolute;
   width: 64px;
   height: 64px;
-  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg,
-    var(--vg-accent),
-    #8ffce0,
-    var(--vg-interaction-100),
-    var(--vg-interaction),
-    var(--vg-interaction-100),
-    #8ffce0,
-    var(--vg-accent)
-  );
-  background-size: 400% 400%;
+
   pointer-events: none;
   z-index: 12;
-  animation:
-    vg-float    5s ease-in-out infinite,
-    vg-gradient 10s ease-in-out infinite;
 
+  // the dissolve at the end of the morph. no transform here: the growth to 128px
+  // belongs to vg-loader-deliver, which holds it via animation-fill-mode, and an
+  // animation outranks a declaration on the same property anyway.
+  transition: opacity var(--vg-reveal-dissolve) ease;
+
+  // circle fill
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: var(--vg-primary);
+    box-shadow: rgba(0, 0, 0, 0.28) 0 8px 24px 0;
+    z-index: 0;
+  }
+
+  // rebound ring — the second wave, and it answers a different event than the
+  // first. __loader-ring fires on the burst at 74%; this one fires on the landing
+  // at 82%, the instant the collapse bottoms out at scale 0.95 and reverses. so
+  // the two are not a wave and its echo, they are one ring per impact: the
+  // balloon bursting, then the balloon hitting bottom and bouncing.
+  //
+  // inset -2px = a 68×68 box, sized for the event it belongs to rather than to
+  // __loader-ring's 96×96. at 82% the fill is squashed to 60.8px, so 68px lands
+  // just outside the compressed circle and expands out of it as it rebounds.
+  // that is also why it can be this small without looking detached — it is
+  // measured against the collapsed balloon, not the inflated one.
+  //
+  // it paints above __loader-ring (tree order: ::before, the ring span, then
+  // ::after) but never collides with it: it starts smaller, leaves later and
+  // stops shorter, so it is always the inner wave.
+  //
+  // like the ring, it deliberately does NOT ride vg-loader-grow — a wave that
+  // inflates with the balloon is not a wave.
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    border: 4px solid var(--vg-primary);
+    opacity: 0;
+    z-index: 0;
+  }
+
+  // 32px in the 64px box = half the diameter. also the ceiling: any larger and
+  // the 14px badge, which is centred on this glyph's corner, breaks the circle's
+  // rim. see __loader-badge for the dependency.
   svg {
+    position: relative;
+    z-index: 1;
+    width: 32px;
+    height: 32px;
     pointer-events: none;
-    /* attract: instant (driven by mousemove); snap-back: spring overshoot then settle */
-    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
 
-    &.js-attracting {
-      transition: none;
+  // the glyph is a filled path with no stroke colour — fill alone is the whole
+  // weight control, no --vg-icon-weight equivalent needed
+  svg path {
+    fill: var(--vg-white);
+  }
+
+  // -> pulse state
+  // the loop: inflate, hold, burst, rebound, settle — played --vg-loader-cycles
+  // times. every layer shares one cycle length and iteration count.
+  //
+  // no fill-mode, and that is load-bearing: each animation's last keyframe already
+  // equals its element's base state, so runReveal() can swap this class for
+  // .js-loader-deliver on a whole cycle boundary without anything snapping.
+  //
+  // the badge deliberately does not appear here. it announces itself once, on the
+  // delivery — see .js-loader-deliver.
+  &.js-loader-loading {
+    // linear here is only the default for intervals that don't set their own —
+    // vg-loader-grow declares animation-timing-function per keyframe, because its
+    // phases need different curves (constant-speed growth, then a snap, then a
+    // spring). do not "fix" this to ease-in-out: it would be silently ignored.
+    &::before {
+      animation: vg-loader-grow var(--vg-loader-cycle) linear var(--vg-loader-cycles);
     }
+
+    // linear, not ease-out: with ease-out the ring covered most of its travel in
+    // the first third of an already short window, so the motion read as a flick.
+    // linear spends the whole window moving.
+    &::after {
+      animation: vg-loader-ring-echo var(--vg-loader-cycle) linear var(--vg-loader-cycles);
+    }
+
+    // the glyph and the badge are both printed on the balloon: same keyframe set,
+    // same amplitude, so they inflate and snap back with the surface they sit on
+    // and can never drift apart. the glyph's transform-origin is its own centre,
+    // which the flex box has already put on the circle's centre; the badge needs
+    // a shifted origin to reach the same point — see its own rule below.
+    svg,
+    .video-guide__loader-badge {
+      animation: vg-loader-grow var(--vg-loader-cycle) linear var(--vg-loader-cycles);
+    }
+
+    .video-guide__loader-ring {
+      animation: vg-loader-ring var(--vg-loader-cycle) ease-out var(--vg-loader-cycles);
+    }
+  }
+
+  // -> deliver state
+  // the last inflation, and the one that does not burst. it runs for exactly one
+  // --vg-loader-cycle and opens with the pulse's own inflate and hold, so it is
+  // indistinguishable until the beat where the balloon would pop. then it keeps
+  // expanding to scale 2 — precisely the toggle's 128px disc at precisely the
+  // toggle's centre. the loader stops standing in for the widget and becomes it.
+  //
+  // fill-mode forwards throughout: every layer has to hold at its final frame
+  // while runReveal() reveals the widget behind the disc and then dissolves this
+  // one away. without it they would all snap back to 64px the instant the
+  // animation ended.
+  //
+  // two layers behave differently here than in the pulse:
+  //   __loader-ring reuses vg-loader-ring untouched. the flourish and the burst
+  //     ping are the same event on the same beat, so they are the same keyframes —
+  //     the only difference is that it plays once instead of looping.
+  //   ::after gets nothing at all. it is the rebound ring, and it answers the
+  //     balloon hitting bottom; in this phase the balloon never lands. left
+  //     unanimated it sits at its base state, invisible. it must NOT be given
+  //     vg-loader-deliver — that would inflate a 68px ring to 136px.
+  &.js-loader-deliver {
+    &::before,
+    .video-guide__loader-badge {
+      animation: vg-loader-deliver var(--vg-loader-cycle) linear 1 forwards;
+    }
+
+    // the glyph rides the expansion but fades out on the way, so what is left at
+    // 128px is a plain disc — ready to dissolve onto the avatar without a ghost
+    // of the icon crossing it.
+    svg {
+      animation:
+        vg-loader-deliver      var(--vg-loader-cycle) linear 1 forwards,
+        vg-loader-deliver-fade var(--vg-loader-cycle) linear 1 forwards;
+    }
+
+    .video-guide__loader-ring {
+      animation: vg-loader-ring var(--vg-loader-cycle) ease-out 1 forwards;
+    }
+  }
+
+  // -> badge arrival
+  // its own state, independent of pulse and deliver, because it straddles them:
+  // the badge arrives one round before the delivery and stays put through the
+  // round change. that is also why the animation is declared here and nowhere
+  // else — .js-loader-loading coming off and .js-loader-deliver going on
+  // underneath it leaves this declaration untouched, so the badge does not
+  // restart mid-life.
+  //
+  // the anchor is not mentioned: it rides whichever balloon animation is current,
+  // so the badge shrinks and rebounds with round 2's burst and then expands with
+  // round 3's delivery, all without this rule's involvement.
+  //
+  // two cycles: the last pulse plus the delivering round. that span holds no
+  // matter what --vg-loader-cycles is, since the badge is always keyed to the
+  // second-to-last round.
+  &.js-loader-badge {
+    .video-guide__loader-badge-dot {
+      animation: vg-loader-badge-arrive
+                 calc(var(--vg-loader-cycle) * 2) linear 1 forwards;
+    }
+  }
+
+  // -> dissolve state
+  // the last step of the morph, and the only one that is a transition rather than
+  // an animation. by this point the loader is a plain 128px disc and the toggle's
+  // identical disc sits directly underneath at full opacity, so fading this one
+  // out does not read as a circle disappearing — it reads as the avatar arriving.
+  // the drop shadow going with it is the only edge that visibly changes.
+  //
+  // opacity only. the 128px size is held by vg-loader-deliver's fill-mode, and a
+  // running animation outranks a declaration on the same property, so a transform
+  // here would be ignored.
+  &.js-loader-out {
+    opacity: 0;
   }
 
   &.js-hidden {
@@ -223,19 +448,287 @@ p {
   }
 }
 
-@keyframes vg-float {
-  0%, 100% { transform: translateY(0); }
-  50%       { transform: translateY(-8px); }
+// inset -16px makes the box 96×96 — the balloon's fully inflated size, not its
+// resting 64px. that way scale 1 is exactly where the surface was at the moment
+// it burst, so the shockwave is released from the right radius and the 3px border
+// reads at its true width instead of being pre-magnified by a start scale.
+.video-guide__loader-ring {
+  position: absolute;
+  inset: -16px;
+  border-radius: 50%;
+  border: 3px solid var(--vg-interaction);
+  opacity: 0;
+  z-index: 0;
+  pointer-events: none;
 }
 
-@keyframes vg-gradient {
-  0%   { background-position: 0%   85%; }
-  15%  { background-position: 100% 10%; }
-  30%  { background-position: 30%  100%; }
-  47%  { background-position: 90%  60%; }
-  63%  { background-position: 10%  0%; }
-  78%  { background-position: 75%  90%; }
-  100% { background-position: 0%   85%; }
+// -> notification badge (anchor box)
+// hidden by default. it arrives once, halfway through the second-to-last round's
+// inflation, and stays for the rest of the intro — so it reads as a notification
+// turning up rather than as a permanent fixture. while visible it rides the
+// balloon with the glyph. timing lives in vg-loader-badge-arrive.
+//
+// this element only positions and rides — the visible dot is the child. splitting
+// them is what allows both motions at once: the outer box's transform belongs to
+// vg-loader-grow (the balloon ride), the dot's belongs to vg-loader-badge-reveal
+// (the pop from scale 0). a single element cannot carry both, because a second
+// animation on the same property overwrites the first rather than composing.
+//
+// position — iphone style, centred on the glyph's top-right corner so it
+// overhangs by half its width. the 32px glyph is flex-centred in the 64px box, so
+// it spans (16,16) → (48,48) and its corner sits at (48,16). a 14px dot centred
+// there means top 9px / right 9px (left edge 64 - 9 - 14 = 41).
+//
+// transform-origin — this is what welds it to that corner while the balloon
+// inflates. the glyph scales about the circle's centre, and the badge has to
+// scale about the same point or it would grow in place and slide off the corner.
+// the circle's centre is (32,32), the badge's box starts at (41,9), so that point
+// in badge-local coordinates is (32-41, 32-9) = (-9px, 23px).
+//
+// check at the 1.5 peak: the badge's centre is offset (16,-16) from the origin →
+// (24,-24) → lands at (56,8). the glyph's corner goes to (32+16*1.5, 32-16*1.5)
+// = (56,8). same point, so they stay locked at every scale in between.
+//
+// ⚠️ these four numbers are derived from the glyph's size. resizing the svg
+// without redoing them slides the badge off the corner. for a glyph of G and a
+// badge of B inside the 64px box:
+//     top = right      = 32 - (G + B) / 2
+//     transform-origin = (B - G) / 2   (G + B) / 2
+// 32px is also the practical ceiling for G: the badge's outer edge already sits
+// only 2.4px inside the 64px rim (22.63px to its centre + 7px radius = 29.6px
+// against a 32px radius), and at the 1.5 peak 3.6px inside.
+.video-guide__loader-badge {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 14px;
+  height: 14px;
+  transform-origin: -9px 23px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+// -> notification badge (the visible dot)
+// fills its anchor box, so its own transform-origin is the box's centre and the
+// pop grows outward from the middle of the badge — the iphone read. that origin is
+// deliberately NOT the shifted one above: the anchor handles staying on the
+// glyph's corner, the dot only handles appearing.
+//
+// base state is scale(0) / opacity 0, which is also where the reveal keyframes
+// end, so dropping .js-loader-loading on a cycle boundary snaps nothing.
+//
+// -> the "1"
+// decorative, not a real count — the widget has no message state to report, and
+// the whole loader is aria-hidden, so nothing announces it.
+//
+// ⚠️ white on --vg-interaction is 3.6:1. that clears AA for large text (3:1) but
+// not for normal text (4.5:1), and a 9px digit is emphatically not large text.
+// it passes as decoration only because it carries no information. do NOT reuse
+// this pairing for anything a visitor has to read — swap the background to
+// --vg-interaction-600 (#b31f3d, 6.6:1 against white) if it ever gains meaning.
+.video-guide__loader-badge-dot {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--vg-interaction);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  color: var(--vg-white);
+  font-family: sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+
+  transform: scale(0);
+  opacity: 0;
+}
+
+// -> loader keyframes
+// vg-loader-grow is shared by the fill, the flash overlay and the glyph — one
+// keyframe set, three elements, so they can never drift apart. never applied to
+// .video-guide__loader itself; see the reasons above the rule.
+
+// -> circle growth
+// inflate → hold → snap shut → rebound. one beat per cycle, not two.
+//
+// scale 1.5 on the 64px box = 96px. the timing function is declared per keyframe
+// because each phase needs a different curve; the one in the animation shorthand
+// is only a fallback for intervals that don't set their own.
+//
+// phase map at the 1050ms production cycle (--vg-loader-cycle scales all of it):
+//   0 → 58%    609ms  growth, linear — constant speed the whole way, no easing
+//                     in or out, so it reads as inflating rather than pulsing
+//   58 → 74%   168ms  hold at full size
+//   74 → 82%    84ms  collapse. short enough that the curve barely registers —
+//                     the abruptness comes from the duration, not the easing
+//   82 → 90%    84ms  undershoot past rest (0.95) springs back up past it (1.02)
+//   90 → 100%  105ms  settle
+@keyframes vg-loader-grow {
+  0%   { transform: scale(1);    animation-timing-function: linear; }
+  58%  { transform: scale(1.5);  animation-timing-function: linear; }
+  74%  { transform: scale(1.5);  animation-timing-function: cubic-bezier(0.45, 0, 0.3, 1); }
+  82%  { transform: scale(0.95); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
+  90%  { transform: scale(1.02); animation-timing-function: ease-out; }
+  100% { transform: scale(1); }
+}
+
+// -> ring ping
+// one shockwave per cycle, released by the collapse — the balloon bursts and
+// leaves an expanding ring behind where its surface was. it stays parked and
+// invisible through the whole inflate and hold: a visible ring during growth
+// would just draw a green circle on top of the fill, since it paints above
+// ::before and does not scale with it.
+//
+// keyed off vg-loader-grow's collapse at 74%. move that and this has to move too.
+//   0 → 74%   parked at scale 1 (= 96px, the inflated surface), opacity 0
+//   74 → 75%  released — near-instant appear, no fade-in, so it reads as a snap
+//   75 → 96%  expands to 120px and fades out (ease-out from the shorthand)
+//   96 → 100% resets while invisible
+//
+// the 1.25 peak is the one number to touch if the throw needs retuning — it is
+// travel, not speed: the 75 → 96% window stays put, so a smaller peak also means
+// a slower, softer wave. 1.5 = 144px was too far; below ~1.2 it stops reading as
+// a shockwave and turns into a rim highlight.
+@keyframes vg-loader-ring {
+  0%, 74% { transform: scale(1);    opacity: 0; }
+  75%     { transform: scale(1);    opacity: 0.6; }
+  96%     { transform: scale(1.25); opacity: 0; }
+  100%    { transform: scale(1);    opacity: 0; }
+}
+
+// -> rebound ring
+// the ::after layer. keyed to vg-loader-grow's 82% undershoot — the collapse
+// bottoms out at scale 0.95 there and reverses, and this ring leaves on that
+// impact. move the 82% keyframe in vg-loader-grow and this has to move with it.
+//
+// the offset is baked into the keyframe percentages rather than set with
+// animation-delay on purpose. a delay would hold the phase shift across
+// iterations, but it also pushes the animation's tail past the end of the loop,
+// and runReveal() drops .js-loader-loading on a whole-cycle boundary — the ring
+// would be cut mid-flight on the last cycle.
+//
+// stays subordinate to the burst ring: 68px box against 96px, 0.35 peak opacity
+// against 0.6, and a stop at 1.16 against 1.25.
+//   0 → 81%   parked, invisible
+//   82%       released on the landing, near-instant appear
+//   82 → 99%  expands 68px → 79px, fades out
+//   99 → 100% resets while invisible
+//
+// this ring is boxed in: it cannot leave before the 82% landing and it has to be
+// finished by the end of the cycle, so 17% (≈179ms at the 1050ms cycle) is all
+// the room there is. the linear easing in the shorthand is what buys most of the
+// perceived slowdown. for a genuinely slower wave, raise REVEAL.loaderCycle in
+// video-guide.js — every phase here is a percentage, so a longer cycle stretches
+// this window along with everything else.
+@keyframes vg-loader-ring-echo {
+  0%, 81% { transform: scale(1);    opacity: 0; }
+  82%     { transform: scale(1);    opacity: 0.35; }
+  99%     { transform: scale(1.16); opacity: 0; }
+  100%    { transform: scale(1);    opacity: 0; }
+}
+
+// ORPHANED — nothing applies this any more. ::after was its only host and is now
+// the echo ring. still on the old two-beat rhythm (12% and 76%), so it would need
+// remapping to the collapse at 74% before it could be reused. kept for now in
+// case the fill flash comes back on a layer of its own; safe to delete otherwise.
+@keyframes vg-loader-flash {
+  0%,   4%   { opacity: 0; }
+  12%        { opacity: 0.55; }
+  24%,  70%  { opacity: 0; }
+  76%        { opacity: 0.45; }
+  88%,  100% { opacity: 0; }
+}
+
+// -> deliver keyframes
+// these run for one --vg-loader-cycle, the same duration as a pulse, so their
+// percentages are directly comparable to vg-loader-grow's — and the two that
+// matter are copied from it verbatim:
+//   58%  the inflation tops out (vg-loader-grow: same)
+//   74%  the beat where the balloon bursts (vg-loader-grow: same)
+// so the first three quarters of this phase is not an imitation of a pulse, it
+// is the same motion on the same clock. the visitor is primed for another burst
+// and gets a delivery instead. retune --vg-loader-cycle to anything you like and
+// this stays true; nothing here has to be rederived.
+
+// the riders: ::before, the glyph, the badge anchor. NOT ::after — that is the
+// rebound ring, and it has no part in the delivery.
+@keyframes vg-loader-deliver {
+  0%   { transform: scale(1);   animation-timing-function: linear; }
+  58%  { transform: scale(1.5); animation-timing-function: linear; }
+  74%  { transform: scale(1.5); animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1); }
+  94%  { transform: scale(2); }
+  100% { transform: scale(2); }
+}
+
+// the expansion takes 74 → 94%, which is 630ms of the 3150ms cycle. that is most
+// of the 26% the burst and rebound used to occupy — deliberately, because the
+// morph is the payoff and rushing it undercuts the whole intro.
+//
+// the 94 → 100% hold is not padding. runReveal()'s morph step is a setTimeout, so
+// it cannot land on an exact frame; holding at full size for the last 6% gives it
+// a 189ms window to arrive in rather than a deadline to hit.
+//
+// this expansion is capped by the cycle, since the deliver phase is exactly one
+// cycle long. if it needs to be slower still, --vg-reveal-dissolve is the
+// unbounded half of the morph — lengthen that first.
+
+// the glyph clears out while the disc is still expanding, so what remains at
+// 128px is plain — no ghost of the icon crossing the avatar during the dissolve
+@keyframes vg-loader-deliver-fade {
+  0%, 74% { opacity: 1; }
+  90%     { opacity: 0; }
+  100%    { opacity: 0; }
+}
+
+// -> badge, its one appearance
+// runs on __loader-badge-dot, not on the anchor box — the anchor's transform is
+// spoken for by whichever balloon animation is running, and this needs one of
+// its own.
+//
+// percentages here are of a TWO cycle span: the second-to-last round, then the
+// delivering round. so 50% is the boundary between them, and any mark inside the
+// delivering round is 50% + half of its own percentage:
+//   round 2 inflate ends   58% of its cycle  → 29% of the span
+//   badge arrives          half that inflate → 14.5%
+//   round 3 expansion      74% of its cycle  → 87%
+//   round 3 glyph gone     90% of its cycle  → 95%
+//
+// it arrives at the halfway mark of round 2's inflation, the same rule the badge
+// has always followed: the inflate is linear, so half the time is half the size,
+// and the disc is at 80px when the badge lands.
+//
+// it does not leave at round 2's burst. it holds through the collapse, the
+// rebound and the whole delivering round, riding the anchor the entire way, and
+// only fades during the morph — in step with the glyph, because the widget it
+// hands over to has no badge and anything still visible would vanish abruptly.
+//   0 → 14.5%   hidden at scale 0
+//   14.5 → 16.5% pops out to 1.25, ease-out (126ms)
+//   16.5 → 18%  settles to 1
+//   18 → 87%    visible across round 2's burst and all of round 3
+//   87 → 95%    fades out as the disc expands into the widget
+//   95 → 100%   gone
+@keyframes vg-loader-badge-arrive {
+  0%, 14.5% { transform: scale(0);    opacity: 0; animation-timing-function: ease-out; }
+  16.5%     { transform: scale(1.25); opacity: 1; animation-timing-function: ease-in-out; }
+  18%       { transform: scale(1);    opacity: 1; }
+  87%       { transform: scale(1);    opacity: 1; }
+  95%       { transform: scale(1);    opacity: 0; }
+  100%      { transform: scale(1);    opacity: 0; }
+}
+
+// ORPHANED — nothing applies this any more. it was the badge's old spawn / hold /
+// shrink-away shape, replaced by vg-loader-badge-reveal above. safe to delete.
+@keyframes vg-loader-badge {
+  0%   { transform: scale(0);    opacity: 0; }
+  10%  { transform: scale(0.6);  opacity: 1; }
+  27%  { transform: scale(1.28); opacity: 1; }
+  38%  { transform: scale(1);    opacity: 1; }
+  71%  { transform: scale(1);    opacity: 1; }
+  100% { transform: scale(0);    opacity: 0; }
 }
 
 // -> splash layer (avatar + chat bubble — 256×256)
@@ -246,6 +739,7 @@ p {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+
 
   img {
     width: 100%;
@@ -305,8 +799,13 @@ p {
 
   opacity: 0;
 
+  // opacity duration comes from a custom property so the intro can zero it: at
+  // the morph this element is completely hidden behind the loader's 128px disc,
+  // and a fade nobody can see is only wasted wall time. runReveal() sets it to
+  // 0ms for that one moment and removes it again, handing the default back to the
+  // minimize/maximize flow.
   transition:
-    opacity .4s ease,
+    opacity var(--vg-toggle-fade) ease,
     top .4s cubic-bezier(0.6, 0, 0.2, 1),
     right .4s cubic-bezier(0.6, 0, 0.2, 1),
     width .6s cubic-bezier(0.6, 0, 0.2, 1),
@@ -337,12 +836,9 @@ p {
   }
 
   .video-guide__toggle-btn--minimize {
-    transform: translate(-80px, 80px);
-    opacity: 0;
+    transform: translate(-100px, 100px);
     transition: transform 0.5s cubic-bezier(0.6, 0, 0.2, 1),
                 opacity 0.5s cubic-bezier(0.6, 0, 0.2, 1);
-
-    // opacity: 1;
   }
 
   &.js-toggle-revealed {
@@ -351,13 +847,14 @@ p {
     width: 56px;
     height: 56px;
 
-    .video-guide__splash {
-      transform: translate(64px, -64px);
-      opacity: 0;
-      transition:
-        transform 0.5s cubic-bezier(0.6, 0, 0.2, 1),
-        opacity 0.5s cubic-bezier(0.6, 0, 0.2, 1);
-    }
+    // drop behind __content (z 2) so the toggle slides out from under the video
+    // circle and tucks back under it — no opacity involved. scoped to this class
+    // on purpose: while minimized the toggle carries the splash avatar, which
+    // has to stay ON TOP of the content circle it covers.
+    //
+    // z-index: auto would not work here — it ties with __content's old auto and
+    // DOM order wins, and the toggle comes after __content in widget.html.
+    z-index: 1;
 
     .video-guide__splash img {
       border-width: 8px;
@@ -369,40 +866,157 @@ p {
       opacity: 1;
     }
 
-    /* auto-hide after 5s idle in expanded mode — fades out and slides back to center */
+    /* auto-hide while expanded — slides back under the video circle, no fade.
+       116px puts the toggle's centre exactly on the expanded content circle's
+       centre (256 root - 112 content centre - 28 toggle radius), so its 28px
+       radius sits 75px inside the viewport's 103.04px circle and is fully
+       covered. the old 64px cleared by only 1.5px. */
     &.js-toggle-idle {
-      opacity: 0;
       pointer-events: none;
-      top: 64px;
-      right: 64px;
+      top: 116px;
+      right: 116px;
+
+      .video-guide__splash {
+        transform: translate(0, 0);
+      }
     }
   }
 }
 
 // -> chat bubble
+// anchored to .video-guide, not to __splash. it can't live inside __toggle: that
+// element's clip-path: circle(50%) trims every descendant to its circle, which
+// would cut away most of the bubble, and __splash collapses to 0x0 while the
+// widget is expanded.
+//
+// bottom/right 60% of the 256px root lands the bubble exactly where the old
+// 70% of the 128px splash box did — same anchor point, new reference box.
 
 .video-guide__chat-bubble {
   position: absolute;
-  bottom: 70%;
-  right: 70%;
+  bottom: 60%;
+  right: 60%;
   width: 200px;
   background: var(--vg-white);
   border-radius: 16px 16px 4px 16px;
   padding: 12px 16px;
   box-shadow: rgba(0, 0, 0, 0.15) 0px 4px 16px;
+
+  z-index: 11; // above __toggle (10), below __loader (12) — the intro owns the
+               // top layer, and the bubble is still hidden while it plays
+
+  cursor: pointer;
+
+  // stays none while hidden — an invisible 200px box here would otherwise
+  // swallow clicks meant for the host page underneath it.
   pointer-events: none;
 
   opacity: 0;
   transform: scale(0.85) translate(10px, 10px);
   transform-origin: bottom right;
-  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
 
-  display: none;
+  // visibility keeps the close button out of the tab order while the bubble is
+  // hidden. delayed by the fade duration so it only applies once the bubble has
+  // finished fading out.
+  visibility: hidden;
+  transition:
+    opacity 0.3s ease-in-out,
+    transform 0.3s ease-in-out,
+    visibility 0s linear 0.3s;
 
   &.js-bubble-visible {
     opacity: 1;
     transform: scale(1) translate(0, 0);
+    pointer-events: auto;
+    visibility: visible;
+    transition-delay: 0s;
   }
+}
+
+// -> chat bubble close
+// white circle overhanging the bubble's top-right corner. the bubble is white
+// too, so the drop shadow is what separates the two surfaces.
+
+.video-guide__chat-bubble-close {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 24px;
+  height: 24px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: var(--vg-white);
+  border: none;
+  border-radius: 50%;
+  box-shadow: rgba(0, 0, 0, 0.2) 0px 1px 4px;
+
+  // hidden by default — revealed by the rule below. pointer-events tracks
+  // opacity so an invisible button can never take a click.
+  opacity: 0;
+  pointer-events: none;
+
+  transition:
+    opacity 0.2s ease-in-out,
+    background 0.2s ease-in-out;
+
+  svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  svg path {
+    fill: var(--vg-primary);
+    transition: fill 0.2s ease-in-out;
+  }
+
+  &:hover,
+  &:active,
+  &:focus-visible {
+    background: var(--vg-interaction);
+    outline: none;
+
+    svg path {
+      fill: var(--vg-white);
+    }
+  }
+
+  // neutralize global focus styling from the host page
+  &:focus {
+    outline: none;
+  }
+}
+
+// -> chat bubble close reveal
+// two conditions, both required: the greeting is up AND the pointer is on the
+// widget. :hover on .video-guide covers the bubble as well — hover propagates to
+// ancestors regardless of geometry, so it still matches where the bubble
+// overhangs the widget's box.
+// :focus-visible is a separate path so keyboard users can still reach the button
+// without a pointer anywhere near the widget.
+
+.video-guide:hover .video-guide__chat-bubble.js-bubble-visible .video-guide__chat-bubble-close {
+  opacity: 1;
+  pointer-events: auto;
+
+  // staged entrance, mirroring the exit. leaving the widget drops the close
+  // button immediately while the bubble waits out its 250ms grace period (js),
+  // so the button leaves first and the bubble follows. entering reverses that:
+  // the bubble fades in over 0.3s and the button trails it by the same 0.3s.
+  //
+  // the delay sits on opacity only — background stays instant so the button's
+  // own hover colour never lags behind the cursor.
+  transition:
+    opacity 0.2s ease-in-out 0.3s,
+    background 0.2s ease-in-out;
+}
+
+// keyboard focus reveals it straight away — no staging, the user asked for it
+.video-guide__chat-bubble-close:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .video-guide__chat-bubble-text {
@@ -478,6 +1092,11 @@ p {
 
 // -> progress grabber
 
+// the dot orbits at radius 107.52px — the exact circle the control buttons now
+// sit on. z 3 (not 4) keeps it above the viewport, where the enlarged hover dot
+// still needs to be, while letting .video-guide__controls — same z, later in the
+// DOM — paint its buttons over the dot as it passes bottom-dead-centre.
+
 .video-guide__progress-grabber {
   position: absolute;
   top: 2%;
@@ -485,7 +1104,7 @@ p {
   width: 96%;
   height: 96%;
   pointer-events: none;
-  z-index: 4;
+  z-index: 3;
 }
 
 .video-guide__progress-grabber-dot {
@@ -625,6 +1244,10 @@ p {
 }
 
 // -> controls overlay
+// shares the viewport's box (inset 4%) so button offsets are measured from the
+// centre of the video circle. sits permanently above the viewport (z 3) — the
+// hidden state is opacity/visibility, never stacking, so no layer has to be
+// re-ordered while the reveal animation is running.
 
 .video-guide__controls {
   position: absolute;
@@ -633,12 +1256,69 @@ p {
   width: 92%;
   height: 92%;
 
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
   z-index: 3;
   pointer-events: none;
+
+  // ==========================================================================
+  // -> ARC GEOMETRY — the one place to tune where the control buttons sit
+  // ==========================================================================
+  //
+  // declared here, on the buttons' and the pill's nearest common ancestor, so
+  // every consumer inherits the same numbers. the pill has to sit exactly on the
+  // info button and used to carry its own copy of that angle — two places to
+  // edit, one guaranteed to be forgotten.
+  //
+  // -> the radius
+  // the controls box is inset 4% of __content, so its centre coincides with the
+  // progress ring's centre and every offset below is a true polar coordinate.
+  // expanded __content = 224px → ring outer radius 112px. __viewport covers the
+  // middle from radius 103.04px (92% of 224 / 2), so the visible ring band runs
+  // 103.04 … 112px and its centreline sits at (103.04 + 112) / 2 = 107.52px.
+  // that is also the exact circle the progress grabber dot orbits — see
+  // .video-guide__progress-grabber.
+  --vg-ring-r: 107.52px;
+  //
+  // -> the slots
+  // x = r * sin(theta), y = r * cos(theta), theta measured from bottom-dead-
+  // centre with positive to the RIGHT. any angle put through this formula lands
+  // on the ring by construction, so a button can never drift off the band.
+  //
+  // currently 27° apart at -12° / +15° / +42°. the arc's midpoint is the play
+  // button at +15°, not bottom-dead-centre — that rightward rotation is
+  // intentional, not drift.
+  //
+  // spacing: chord = 2 * 107.52 * sin(step / 2), minus the 42px button width.
+  //   step   chord    gap between buttons
+  //   22°    41.03px   -0.97px  (overlapping)
+  //   24°    44.71px    2.71px
+  //   26°    48.37px    6.37px
+  //   27°    50.20px    8.20px   <- current
+  //   28°    52.03px   10.03px
+  //   30°    55.66px   13.66px
+  //   32°    59.27px   17.27px
+  //
+  // trig is pre-resolved rather than using css sin()/cos() so an unsupported
+  // browser cannot invalidate a custom property and dump every button at 0,0.
+  // to retune, pick a step, keep the midpoint at +15°, and copy the values:
+  //   sin(9°)  = 0.1564345   cos(9°)  = 0.9876883
+  //   sin(12°) = 0.2079117   cos(12°) = 0.9781476
+  //   sin(15°) = 0.2588190   cos(15°) = 0.9659258
+  //   sin(18°) = 0.3090170   cos(18°) = 0.9510565
+  //   sin(21°) = 0.3583679   cos(21°) = 0.9335804
+  //   sin(28°) = 0.4694716   cos(28°) = 0.8829476
+  //   sin(29°) = 0.4848096   cos(29°) = 0.8746197
+  //   sin(41°) = 0.6560590   cos(41°) = 0.7547096
+  //   sin(42°) = 0.6691306   cos(42°) = 0.7431448
+  //   sin(43°) = 0.6819984   cos(43°) = 0.7313537
+  //   sin(45°) = 0.7071068   cos(45°) = 0.7071068
+  // negate x for a slot left of centre. y is always positive — the arc lives on
+  // the bottom half of the ring.
+  --vg-slot-volume-x: calc(var(--vg-ring-r) * -0.2079117); // -12°
+  --vg-slot-volume-y: calc(var(--vg-ring-r) *  0.9781476);
+  --vg-slot-play-x:   calc(var(--vg-ring-r) *  0.2588190); // +15°
+  --vg-slot-play-y:   calc(var(--vg-ring-r) *  0.9659258);
+  --vg-slot-info-x:   calc(var(--vg-ring-r) *  0.6691306); // +42°
+  --vg-slot-info-y:   calc(var(--vg-ring-r) *  0.7431448);
 }
 
 // -> toggle button
@@ -650,14 +1330,14 @@ p {
   justify-content: center;
   transition: all 0.3s ease-in-out;
 
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
 
   border: 2px solid var(--vg-primary);
   border-radius: 100%;
 
   background: var(--vg-primary);
-  z-index: 10;
+
 
   svg {
     width: 32px;
@@ -698,24 +1378,103 @@ p {
 }
 
 // -> controls buttons
+// every button shares one transform chain: centre itself on the controls box,
+// then travel to its active slot via --vg-btn-x / --vg-btn-y. the resting state
+// simply drops those offsets, so all buttons collapse back into the middle of
+// the circle. adding a button = one --vg-btn-x override, nothing else.
+//
+// resting state uses opacity + visibility rather than hiding behind the
+// viewport: occlusion would break the moment the viewport shows an alpha video,
+// and it would leave the buttons in the tab order while minimized.
 
 .video-guide__controls-btn {
+  // slot coordinates and the ring radius are inherited from
+  // .video-guide__controls — see the ARC GEOMETRY block there to retune them.
+  // these two are the fallback for a button with no slot assigned: bottom-dead-
+  // centre.
+  --vg-btn-x: 0px;
+  --vg-btn-y: var(--vg-ring-r);
+
+  position: absolute;
+  top: 50%;
+  left: 50%;
+
+  width: 42px;
+  height: 42px;
   border-radius: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.3s ease-in-out;
-  pointer-events: auto;
-  width: 48px;
-  height: 48px;
+
   background: var(--vg-primary);
   border: 2px solid var(--vg-primary);
+  pointer-events: auto;
 
-  transform: scale(0);
+  // above .video-guide__ai-pill, which shares the info button's slot and has to
+  // paint underneath it. both sit inside .video-guide__controls, which is a
+  // stacking context (positioned + z-index 3), so this stays local and does not
+  // disturb the controls-vs-grabber ordering documented further up.
+  z-index: 1;
 
+  // resting state — parked in the centre, invisible, not focusable
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, -50%) scale(0.4);
+
+  // transform duration + easing deliberately match .video-guide__content's size
+  // transition, so the buttons stay proportional to the growing circle instead of
+  // overshooting its edge mid-animation.
+  //
+  // the delays below only ever apply on collapse — the reveal rule resets them
+  // with transition-delay: 0s. so on the way back the button stays fully opaque
+  // for the first half of the 0.6s return trip and fades over the second half,
+  // instead of vanishing after 0.25s while still travelling. visibility flips
+  // last so the button is never hidden mid-animation.
+  transition:
+    visibility 0s linear 0.6s,
+    transform 0.6s cubic-bezier(0.6, 0, 0.2, 1),
+    opacity 0.3s ease 0.3s,
+    background 0.3s ease-in-out,
+    border-color 0.3s ease-in-out;
+
+  &--volume {
+    --vg-btn-x: var(--vg-slot-volume-x);
+    --vg-btn-y: var(--vg-slot-volume-y);
+  }
+
+  &--play {
+    --vg-btn-x: var(--vg-slot-play-x);
+    --vg-btn-y: var(--vg-slot-play-y);
+  }
+
+  &--info {
+    --vg-btn-x: var(--vg-slot-info-x);
+    --vg-btn-y: var(--vg-slot-info-y);
+  }
+
+  // -> icon weight
+  // the icons are filled paths, so their base weight lives in the path data.
+  // the white stroke on top is centred on each outline and dilates the glyph,
+  // which is the only weight control available from css:
+  //   0   = raw fill (thinnest possible without new path data)
+  //   0.5 = current look
+  //   1.2 = noticeably bolder
+  // above ~1.5 small interior gaps close up — the volume-off slash and the gap
+  // between the two pause bars go first. does not apply to the ai label, which
+  // opts out of the stroke entirely; see below.
+  //
+  // must be declared on the paths, not the svg: every path in widget.html
+  // carries its own stroke-width presentation attribute, and an inherited value
+  // never overrides a declaration on the element itself.
+  --vg-icon-weight: 0.2;
+
+  // 24px in a 42px button, holding the same 0.57 glyph-to-button ratio the 28px
+  // icons had at 48px. every icon's rendered size scales with this, including the
+  // ai label — its viewBox padding was tuned as a ratio, so the area match with
+  // the other three survives the change untouched.
   svg {
-    width: 32px;
-    height: 32px;
+    width: 24px;
+    height: 24px;
     fill: var(--vg-white);
     stroke: var(--vg-white);
     transition: all 0.3s ease-in-out;
@@ -725,6 +1484,27 @@ p {
   svg g {
     fill: var(--vg-white);
     stroke: var(--vg-white);
+    stroke-width: var(--vg-icon-weight);
+  }
+
+  // -> ai-disclosure label
+  // reduced to its letterforms in widget.html, so it needs almost nothing here:
+  // the white fill and the 24px box both come from the generic rules above, same
+  // as play and volume. optical sizing is handled by padding inside its viewBox
+  // rather than by a width override here — that is how the other icons do it too
+  // (their glyphs fill only 52-75% of their 24-unit boxes), and it keeps every
+  // svg on the ring the same square, whatever that square's size happens to be.
+  //
+  // the stroke is the one exception. --vg-icon-weight is calibrated for those
+  // 24-unit viewBoxes, where 0.2 units is ~0.23px of real dilation; against this
+  // label's 265-unit box the same value works out to 0.021px. so it would be
+  // invisible here regardless — but an official mark should opt out of being
+  // fattened deliberately, not by accident of scale.
+  //
+  // two classes deep because the generic `svg path` rule above is (0,1,2) and a
+  // single-class override would lose to it wherever it sat in the file.
+  .video-guide__ai-label .video-guide__ai-label-mark {
+    stroke: none;
   }
 
   &:hover {
@@ -749,29 +1529,201 @@ p {
       border-color: var(--vg-interaction);
     }
   }
+}
 
-  &--play,
-  &--volume {
-    position: absolute;
-    bottom: -24px;
-    left: 50%;
-  }
+// -> controls reveal
+// expanded: fan out from the centre to their slots on the ring.
+// transition-delay: 0s zeroes every delay declared in the resting state, so the
+// reveal starts immediately (instant fade-in while sliding) and the staged
+// opacity/visibility timing applies to the collapse only.
 
-  &--volume {
-    transform: translateX(-50%) translateX(-26px) scale(0);
-  }
+.video-guide__content.js-content-expanded .video-guide__controls-btn {
+  opacity: 1;
+  visibility: visible;
+  transform:
+    translate(-50%, -50%)
+    translate(var(--vg-btn-x), var(--vg-btn-y))
+    scale(1);
+  transition-delay: 0s;
+}
 
-  &--play {
-    transform: translateX(-50%) translateX(26px) scale(0);
+// -> ai disclosure pill
+// a capsule stacked under the info button, revealed by hovering it: the button's
+// circle stays put and the pill grows out from beneath it to the right, carrying
+// the word "GENERATED". with the "AI" already on the button, the two read as one
+// label — which is what the official artwork is.
+//
+// -> depth
+// --vg-primary-400 rather than --vg-primary. the pill being a lighter blue than
+// the button is the whole depth cue: same hue, two planes. white on #4a4a7a is
+// 8.2:1, so the word clears AA comfortably even at 9.35px.
+//
+// -> geometry
+// collapsed the pill is 42x34: the button's full width, but 8px shorter. that
+// 4px of circle overhanging top and bottom is the depth cue — the capsule reads
+// as a plane behind the button rather than a shape welded to it.
+//
+// it is centred on the button in both axes despite being anchored by its left
+// edge, because the collapsed width matches the button's exactly: both boxes
+// span the same 42px, so their centres coincide. reduce the collapsed width and
+// that stops being true — the pill would sit off to the left.
+//
+// and it is exactly inscribed in the 42px circle, so nothing peeks out. that
+// holds for any height, not just this one, as long as the radius stays at half
+// the height: each cap is then a semicircle of r whose centre sits (21 - r) from
+// the circle's centre, so its farthest point is r + (21 - r) = 21px away — the
+// circle's radius exactly, whatever r is. the flat edges are inside for the same
+// reason. so the height is free to change; the radius must follow it.
+//
+// the word's 46px offset lives on the word as a margin, NOT as padding here.
+// `* { box-sizing: border-box }` is global, so padding-left: 46px on a 42px-wide
+// box clamps the used width up to 46px and leaks a 4px sliver of the lighter
+// pill out past the circle's right edge.
+//
+// expanded width 140px = 46px to clear the circle + 84px word + 10px right pad.
+// ⚠️ still near the ceiling. the info button's slot puts this pill's left edge
+// 167px into the 256px root, leaving 89px of root plus the widget's 64px right
+// margin = 153px before the viewport edge, so there are ~13px to spare. moving
+// --info to a lower angle is what would buy real room: at 0° there would be
+// 232px available.
+//
+// the word stays at 84px through the 48px → 42px button change, and that made it
+// MORE faithful rather than less: the "AI" on the button shrank with the icons,
+// from 14.90px cap to 12.77px, so the GENERATED/AI cap ratio moved from 0.63 to
+// 0.73 against the official artwork's 0.753.
+.video-guide__ai-pill {
+  // reads the info button's slot from .video-guide__controls rather than
+  // restating the angle, so the two can never disagree about where +42° is
+  --vg-btn-x: var(--vg-slot-info-x);
+  --vg-btn-y: var(--vg-slot-info-y);
+
+  position: absolute;
+  top: 50%;
+  left: 50%;
+
+  // -> resting state: parked in the centre with the buttons
+  // this is the "nested child" behaviour. the pill has no parent to follow, so
+  // it reproduces the button's transform chain instead — same scale(0.4), same
+  // centre park, same 0.6s easing — and the two then travel as one object.
+  //
+  // it matters for more than tidiness: with the pill pinned at the +45° slot
+  // while the buttons fanned out from the middle, the naked capsule sat there
+  // uncovered for the whole 0.6s of the open and close animations.
+  //
+  // the one structural difference from a button is translate(0, -50%) instead of
+  // translate(-50%, -50%): the pill is anchored by its LEFT edge so it grows
+  // rightward rather than from its middle, and -21px (half the button) then
+  // pulls that edge onto the button's. the trailing scale() is what the buttons
+  // use to fan out, and because it sits last in the list it applies in the
+  // pill's own local space — so the left-edge anchoring survives it.
+  transform:
+    translate(0, -50%)
+    translate(-21px, 0)
+    scale(0.4);
+
+  width: 42px;
+  height: 34px;
+  border-radius: 17px;
+  background: var(--vg-primary-400);
+
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+
+  z-index: 0; // under the button (z 1)
+
+  // always auto, and safe: while collapsed the capsule is entirely inside the
+  // button's circle, which sits above it, so the button wins every hit test in
+  // that area. this is what lets the expanded pill keep itself open when the
+  // cursor moves off the button and onto the word.
+  pointer-events: auto;
+
+  opacity: 0;
+  visibility: hidden;
+
+  // transform/opacity/visibility timings are copied verbatim from
+  // .video-guide__controls-btn so the pill cannot drift out of step with the
+  // button it hides behind. as there, the delays only ever apply on the way out —
+  // the expanded rule zeroes them.
+  //
+  // width is the pill's own, and it animates layout rather than compositing.
+  // accepted: one out-of-flow element, hover-driven, never in a loop. scaleX
+  // would squash the letterforms, and clip-path would leave the box permanently
+  // 140px wide — making the empty right half a live hover target over the video.
+  transition:
+    visibility 0s linear 0.6s,
+    transform 0.6s cubic-bezier(0.6, 0, 0.2, 1),
+    opacity 0.3s ease 0.3s,
+    width 0.35s cubic-bezier(0.6, 0, 0.2, 1);
+}
+
+// starts past the circle, so while the pill is collapsed the word is clipped away
+// entirely and the reveal wipes it in from under the button.
+//
+// flex-shrink: 0 is not optional. as a flex item in a 42px box the word would
+// otherwise shrink to nothing and then grow back as the pill widens — the
+// letterforms would stretch horizontally into place instead of being uncovered.
+.video-guide__ai-word {
+  flex-shrink: 0;
+  margin-left: 46px; // 42px circle + a 4px gap
+}
+
+// -> per-character reveal
+// each letter of GENERATED is its own path, so each can be timed independently.
+// they fade in left to right as the capsule opens, instead of the whole word
+// sitting there finished behind a curtain.
+//
+// opacity only, deliberately. a small rise would read nicely but css lengths on
+// svg child elements resolve in USER UNITS, not css pixels — this viewBox is
+// 870 units wide rendered at 84px, so translateY(3px) would move the glyph
+// 0.29 rendered px and look like nothing at all. a visible rise needs ~31 units,
+// which then breaks the moment the word is rescaled. not worth the coupling.
+//
+// no transition-delay here on purpose: the stagger lives in the reveal rule
+// below, so on collapse every letter drops together and the capsule closing is
+// the only motion.
+.video-guide__ai-word-mark {
+  fill: var(--vg-white);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+// nth-child rather than nine hand-written rules. the paths are the svg's only
+// children, so 1..9 maps cleanly onto G-E-N-E-R-A-T-E-D. the index is published
+// as a custom property so the delay itself stays a single declaration.
+@for $i from 1 through 9 {
+  .video-guide__ai-word-mark:nth-child(#{$i}) {
+    --vg-ai-char: #{$i - 1};
   }
 }
 
-.video-guide__content.js-content-expanded .video-guide__controls-btn--volume {
-  transform: translateX(-50%) translateX(-26px) scale(1);
+// travels out to the +45° slot with the buttons, on the buttons' own timing.
+// mirrors .video-guide__content.js-content-expanded .video-guide__controls-btn
+// exactly, minus the centre anchoring.
+.video-guide__content.js-content-expanded .video-guide__ai-pill {
+  opacity: 1;
+  visibility: visible;
+  transform:
+    translate(0, -50%)
+    translate(calc(var(--vg-btn-x) - 21px), var(--vg-btn-y))
+    scale(1);
+  transition-delay: 0s;
 }
 
-.video-guide__content.js-content-expanded .video-guide__controls-btn--play {
-  transform: translateX(-50%) translateX(26px) scale(1);
+// the reveal. two selectors: the button's hover drives it, and the pill's own
+// hover sustains it once expanded, so sliding the cursor right onto the word
+// does not collapse it mid-motion.
+.video-guide__content.js-content-expanded .video-guide__controls-btn--info:hover ~ .video-guide__ai-pill,
+.video-guide__content.js-content-expanded .video-guide__ai-pill:hover {
+  width: 140px; // 46px to clear the circle + 84px word + 10px right pad
+
+  // 30ms apart, so the last letter starts at 240ms and finishes at 420ms against
+  // the capsule's 350ms — the word lands just after the curtain finishes
+  // opening, which reads as the letters being carried out rather than uncovered.
+  .video-guide__ai-word-mark {
+    opacity: 1;
+    transition-delay: calc(var(--vg-ai-char) * 30ms);
+  }
 }
 
 .video-guide__avatar {
