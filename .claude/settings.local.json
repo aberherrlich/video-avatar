@@ -33,7 +33,16 @@
       "Bash(python3 -c \"s=open\\('scss/base.scss'\\).read\\(\\); print\\('braces:', s.count\\('{'\\)-s.count\\('}'\\)\\)\")",
       "Bash(timeout 20 git ls-remote --heads origin)",
       "Bash(timeout 20 ssh -o StrictHostKeyChecking=no -o BatchMode=yes -T git@github.com)",
-      "Bash(timeout 25 git ls-remote --heads origin)"
+      "Bash(timeout 25 git ls-remote --heads origin)",
+      "Bash(git mv *)",
+      "Bash(command -v node)",
+      "Bash(node --check js/video-guide.js)",
+      "Bash(chmod +x scripts/build-dist.sh)",
+      "Bash(bash scripts/build-dist.sh)",
+      "Bash(echo \"exit code: $?\")",
+      "Bash(grep -oE 'html,body\\\\{[^}]*\\\\}' css/base.css)",
+      "Bash(grep -oE '\\\\.video-guide,\\\\.video-guide \\\\*\\\\{[^}]*\\\\}' css/base.css)",
+      "Bash(grep -nE '^\\(html|body|p|\\\\*\\)[ ,{]' dist/video-guide/css/base.css)"
     ]
   }
 }

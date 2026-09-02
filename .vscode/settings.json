@@ -92,8 +92,13 @@
       "format": "compressed",
       "extensionName": ".css",
       "savePath": "/css"
+    },
+    {
+      "format": "expanded",
+      "extensionName": ".css",
+      "savePath": "/dist/video-guide/css"
     }
   ],
   "liveSassCompile.settings.autoprefix": ["> 1%", "last 2 versions", "not dead"],
-  "liveSassCompile.settings.excludeList": ["**/.git", "**/node_modules"]
+  "liveSassCompile.settings.excludeList": ["**/.git", "**/node_modules", "**/dist/**"]
 }

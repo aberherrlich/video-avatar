@@ -4,6 +4,30 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Video Guide 1.7</title>
+
+    <!-- -> dev page styling
+         these used to live in scss/base.scss as global resets. they were only ever
+         here to make this lorem ipsum page readable, and base.scss is injected into
+         host pages we do not control — `p { font-size: 24px }` would have resized
+         every paragraph on a live job offer page. they belong to this page, so they
+         live on this page. demo2.html already carries its own equivalents inline. -->
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+        width: 100%;
+      }
+
+      body {
+        min-height: 100vh;
+      }
+
+      #main-content p {
+        font-size: 24px;
+      }
+    </style>
   </head>
 
   <body>

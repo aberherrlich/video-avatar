@@ -1,0 +1,8 @@
+video guide widget — distribution build
+
+built:      2026-09-02 23:05:42 CEST
+commit:     505b95f (uncommitted changes present at build time)
+branch:     main
+repository: https://github.com/aberherrlich/video-avatar
+
+see HANDOVER.md for integration instructions.
